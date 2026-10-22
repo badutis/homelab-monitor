@@ -57,6 +57,7 @@ EOF
 run "nginx: site configuration is valid" sudo nginx -t -q -p "$tmp/nginx" -c "$tmp/nginx/nginx.conf"
 
 # --- sshd ----------------------------------------------------------------------
+sudo install -d -m 0755 /run/sshd # privilege separation dir; absent when sshd is not running
 ssh-keygen -q -t ed25519 -N '' -f "$tmp/hostkey"
 cat >"$tmp/sshd_config" <<EOF
 Include $rootfs/etc/ssh/sshd_config.d/*.conf
