@@ -46,6 +46,8 @@ VERSION_ID="13"
 VERSION_CODENAME=trixie
 ID=debian
 EOF
+# Trivy detects Debian from /etc/debian_version, as in the real image.
+echo "13.1" | sudo tee "$tmp/mnt/etc/debian_version" >/dev/null
 # One installed package at an old version with known vulnerabilities.
 sudo tee "$tmp/mnt/var/lib/dpkg/status" >/dev/null <<'EOF'
 Package: openssl
