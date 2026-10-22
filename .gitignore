@@ -8,5 +8,8 @@ homelab.env
 *.img
 *.img.xz
 
+# Local build work directory
+/.work/
+
 # Local, per-developer notes for coding assistants
 CLAUDE.md
