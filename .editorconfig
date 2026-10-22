@@ -10,3 +10,9 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 switch_case_indent = true
+
+# Shell scripts installed without a .sh extension.
+[build/userpatches/overlay/rootfs/usr/local/sbin/*]
+indent_style = space
+indent_size = 2
+switch_case_indent = true

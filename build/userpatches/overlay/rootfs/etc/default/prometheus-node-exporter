@@ -1,0 +1,2 @@
+# homelab-monitor: node_exporter of this box is scraped locally only.
+ARGS="--web.listen-address=127.0.0.1:9100"

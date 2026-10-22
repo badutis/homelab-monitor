@@ -29,6 +29,11 @@ kernel_tag="$(grep -E '^linux[[:space:]]' "$repo_root/sources.lock" |
 rm -rf "$armbian/userpatches"
 cp -R "$repo_root/build/userpatches" "$armbian/userpatches"
 
+# Release artifacts for customize-image.sh, verified against sources.lock.
+for artifact in victoriametrics victoriametrics-license grafana; do
+  "$repo_root/scripts/fetch-artifact.sh" "$artifact" "$armbian/userpatches/overlay/downloads"
+done
+
 # shellcheck disable=SC2054 # "sha,xz" is one value, not two array elements
 build_args=(
   BOARD=mkspi
@@ -37,6 +42,8 @@ build_args=(
   BUILD_MINIMAL=yes
   BUILD_DESKTOP=no
   KERNEL_CONFIGURE=no
+  # No automatic root login on the console (Armbian default: yes).
+  CONSOLE_AUTOLOGIN=no
   # Fixed kernel tag instead of the rolling stable branch.
   "KERNELBRANCH=tag:${kernel_tag}"
   # Kernel and u-boot are not upgraded through apt; a new image replaces them.

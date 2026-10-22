@@ -1,0 +1,16 @@
+[Unit]
+Description=Apply homelab.env from the boot partition (first boot)
+Documentation=file:///usr/share/doc/homelab-monitor/README
+ConditionPathExists=/boot/homelab.env
+After=local-fs.target systemd-remount-fs.service
+Before=ssh.service nftables.service victoria-metrics.service grafana-server.service nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homelab-firstboot
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

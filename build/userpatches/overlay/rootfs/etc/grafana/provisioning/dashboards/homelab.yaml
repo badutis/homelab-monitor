@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: homelab-monitor
+    folder: homelab-monitor
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /usr/share/homelab/dashboards
