@@ -49,6 +49,30 @@ chmod 0644 /usr/local/lib/homelab/homelab.sh
 install -d -m 0755 /usr/share/doc/homelab-monitor
 cp "$OVERLAY/README.image" /usr/share/doc/homelab-monitor/README
 
+# Grafana bundled plugins: list what the package ships (directory name =
+# plugin id, checked against plugin.json), load only the prometheus
+# datasource by default, and drop the writable copy the package makes in
+# /var/lib/grafana for auto-updates (we use the packaged copy, see the
+# grafana-server drop-in).
+bundled=/usr/share/grafana/data/plugins-bundled
+: >/usr/share/homelab/grafana-bundled-plugins
+for dir in "$bundled"/*/; do
+  id="$(basename "$dir")"
+  grep -qE "^[[:space:]]*\"id\":[[:space:]]*\"$id\"" "$dir/plugin.json" ||
+    {
+      echo "plugin id in $dir/plugin.json is not $id" >&2
+      exit 1
+    }
+  echo "$id" >>/usr/share/homelab/grafana-bundled-plugins
+done
+grep -qx prometheus /usr/share/homelab/grafana-bundled-plugins
+# shellcheck source=overlay/rootfs/usr/local/lib/homelab/homelab.sh
+source /usr/local/lib/homelab/homelab.sh
+hl_reset
+hl_render_grafana_plugins /usr/share/homelab/grafana-bundled-plugins >/etc/grafana/homelab-plugins.env
+chmod 0644 /etc/grafana/homelab-plugins.env
+rm -rf /var/lib/grafana/plugins-bundled
+
 # nginx: our site only.
 rm -f /etc/nginx/sites-enabled/default
 ln -sf /etc/nginx/sites-available/homelab /etc/nginx/sites-enabled/homelab

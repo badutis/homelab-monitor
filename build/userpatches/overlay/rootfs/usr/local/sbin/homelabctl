@@ -2,8 +2,9 @@
 # homelabctl — apply /etc/homelab/homelab.env to the running system.
 #
 #   homelabctl check [file]   validate a homelab.env (default: the installed one)
-#   homelabctl apply          regenerate the scrape config, firewall networks and
-#                             metrics retention, then reload the services
+#   homelabctl apply          regenerate the scrape config, firewall networks,
+#                             metrics retention and Grafana plugins, then
+#                             reload the services
 #                             (HOMELAB_NO_RELOAD=1: write files only)
 #
 # Edit /etc/homelab/homelab.env as root, then run "sudo homelabctl apply".
@@ -19,6 +20,8 @@ ENV_FILE=/etc/homelab/homelab.env
 SCRAPE_FILE=/etc/victoria-metrics/scrape.yml
 VM_ENV_FILE=/etc/victoria-metrics/victoria-metrics.env
 NFT_LAN_FILE=/etc/homelab/nftables-lan.nft
+GRAFANA_PLUGINS_FILE=/etc/grafana/homelab-plugins.env
+GRAFANA_AVAILABLE_PLUGINS=/usr/share/homelab/grafana-bundled-plugins
 
 die() {
   echo "homelabctl: $*" >&2
@@ -46,21 +49,38 @@ write_file() {
   mv -f "$tmp" "$dest"
 }
 
+# Render the Grafana plugin list into $1 (in this shell, so errors are kept).
+render_plugins_or_die() {
+  if ! hl_render_grafana_plugins "$GRAFANA_AVAILABLE_PLUGINS" >"$1"; then
+    local e
+    for e in "${HL_ERRORS[@]}"; do echo "homelabctl: $e" >&2; done
+    exit 1
+  fi
+}
+
 cmd_check() {
   parse_or_die "${1:-$ENV_FILE}"
+  local tmp
+  tmp="$(mktemp)"
+  render_plugins_or_die "$tmp"
+  rm -f "$tmp"
   echo "ok: ${#HL_TARGETS[@]} target(s), ${#HL_SSH_KEYS[@]} SSH key(s)"
 }
 
 cmd_apply() {
   [[ $EUID -eq 0 ]] || die "apply must run as root (sudo homelabctl apply)"
   parse_or_die "$ENV_FILE"
-  local self changed_vm=0 changed_nft=0
+  local self changed_vm=0 changed_nft=0 changed_grafana=0 plugins
   self="$(hostname)"
+  plugins="$(mktemp)"
+  render_plugins_or_die "$plugins"
 
   mkdir -p "$(dirname "$SCRAPE_FILE")"
   hl_render_scrape "$self" | write_file "$SCRAPE_FILE" 0644 && changed_vm=1
   printf 'RETENTION=%s\n' "$HL_RETENTION" | write_file "$VM_ENV_FILE" 0644 && changed_vm=1
   hl_render_nft_lan | write_file "$NFT_LAN_FILE" 0600 && changed_nft=1
+  write_file "$GRAFANA_PLUGINS_FILE" 0644 <"$plugins" && changed_grafana=1
+  rm -f "$plugins"
 
   # During first boot the services start after us; only check the rules.
   if [[ "${HOMELAB_NO_RELOAD:-0}" == 1 ]]; then
@@ -78,14 +98,18 @@ cmd_apply() {
     systemctl restart victoria-metrics.service
     echo "victoria-metrics: restarted with ${#HL_TARGETS[@]} target(s)"
   fi
-  ((changed_vm || changed_nft)) || echo "nothing changed"
+  if ((changed_grafana)); then
+    systemctl restart grafana-server.service
+    echo "grafana: restarted with plugins: prometheus${HL_GRAFANA_PLUGINS[*]:+ ${HL_GRAFANA_PLUGINS[*]}}"
+  fi
+  ((changed_vm || changed_nft || changed_grafana)) || echo "nothing changed"
 }
 
 case "${1:-}" in
   check) cmd_check "${2:-}" ;;
   apply) cmd_apply ;;
   *)
-    sed -n '2,11s/^# \{0,1\}//p' "$0"
+    sed -n '2,12s/^# \{0,1\}//p' "$0"
     exit 2
     ;;
 esac

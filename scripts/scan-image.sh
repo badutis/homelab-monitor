@@ -4,7 +4,7 @@
 # Mounts the image root filesystem read-only and runs Trivy over it:
 #   <out>/trivy-report.json   full vulnerability report
 #   <out>/sbom.cdx.json       CycloneDX software bill of materials
-#   <out>/trivy-summary.md    short Markdown summary (counts by severity)
+#   <out>/trivy-summary.md    Markdown summary: counts by severity and by source
 #
 # Report only for now: findings do not fail the build. Linux only, needs sudo
 # and trivy in PATH.
@@ -26,36 +26,21 @@ scan() {
   sudo trivy rootfs --quiet --format cyclonedx \
     --output "$out/sbom.cdx.json" "$ROOTFS"
   sudo chown "$(id -u):$(id -g)" "$out/trivy-report.json" "$out/sbom.cdx.json"
+  # Which Grafana bundled plugins the image loads, for the summary.
+  if [ -f "$ROOTFS/etc/grafana/homelab-plugins.env" ]; then
+    cat "$ROOTFS/etc/grafana/homelab-plugins.env" >"$out/grafana-plugins.env"
+  fi
 }
 export -f scan
 export out
 
 "$repo_root/scripts/with-image-rootfs.sh" "$image" bash -c scan
 
-# Summary: vulnerability counts by severity, and how many have a fix.
-python3 - "$out/trivy-report.json" "$(basename "$image")" >"$out/trivy-summary.md" <<'EOF'
-import json, sys
-from collections import Counter
-
-report = json.load(open(sys.argv[1]))
-total, fixable = Counter(), Counter()
-for result in report.get("Results") or []:
-    for v in result.get("Vulnerabilities") or []:
-        sev = v.get("Severity", "UNKNOWN")
-        total[sev] += 1
-        if v.get("FixedVersion"):
-            fixable[sev] += 1
-
-order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
-print(f"### Vulnerability scan: `{sys.argv[2]}`\n")
-print("| Severity | Found | Fix available |")
-print("|---|---:|---:|")
-for sev in order:
-    print(f"| {sev} | {total[sev]} | {fixable[sev]} |")
-os_info = report.get("Metadata", {}).get("OS", {})
-if os_info:
-    print(f"\nOS: {os_info.get('Family', '?')} {os_info.get('Name', '?')}. "
-          "Report only; the full list is in `trivy-report.json`.")
-EOF
+# Summary by severity and by source (Debian, Grafana, plugins, VictoriaMetrics).
+plugins_env=""
+[ -s "$out/grafana-plugins.env" ] && plugins_env="$out/grafana-plugins.env"
+python3 "$repo_root/scripts/scan-summary.py" "$out/trivy-report.json" \
+  "$(basename "$image")" ${plugins_env:+"$plugins_env"} >"$out/trivy-summary.md"
+rm -f "$out/grafana-plugins.env"
 
 cat "$out/trivy-summary.md"
