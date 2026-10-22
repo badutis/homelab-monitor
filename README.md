@@ -11,11 +11,11 @@ RK3328, 1 GB RAM) into a small, self-contained monitoring box for a homelab.
 | Component | Source | Notes |
 |---|---|---|
 | Armbian Debian Trixie minimal, kernel `current` | [`redrathnure/armbian-mkspi`](https://github.com/redrathnure/armbian-mkspi), built from source | kernel and u-boot frozen (`BSPFREEZE=yes`) |
-| [homelable](https://github.com/Pouzor/homelable) | pinned tag, no Docker | Python venv + systemd + nginx; the web UI is built in CI, not on the board |
+| [homelable](https://github.com/Pouzor/homelable) | pinned tag, no Docker | homelab map at `/`; backend in a Python venv (`127.0.0.1:8000`, every dependency SHA256-pinned), web UI built in CI; network discovery (nmap) not included |
 | [VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics) single-node | official `linux-arm64` release, SHA256-pinned | metrics storage, `127.0.0.1:8428`; data ideally on a separate disk |
 | [Grafana OSS](https://github.com/grafana/grafana) | official `arm64` package, SHA256-pinned, held | dashboards and alerts at `/grafana/`, dark theme, no plugin downloads or telemetry; only the Prometheus datasource is loaded by default, other bundled datasources via `GRAFANA_PLUGINS` |
 | `prometheus-node-exporter` | Debian package | metrics of this box, `127.0.0.1:9100` |
-| nginx, nftables | Debian packages | single entry point on port 80; inbound SSH/HTTP from the LAN only |
+| nginx, nftables | Debian packages | single entry point on port 80 (`/` homelable, `/grafana/` Grafana); inbound SSH/HTTP from the LAN only |
 | homelab-monitor glue | this repository | first-boot setup, scrape config generator, dashboards, firewall |
 
 Hardware features on the MKS Pi GPIO header — DS18B20 1-Wire temperature
@@ -41,9 +41,11 @@ On the first boot that finds it, `homelab-firstboot`:
 
 Later changes: edit `/etc/homelab/homelab.env`, then `sudo homelabctl apply`.
 
-Open `http://<box>/` (redirects to `/grafana/`). The Grafana admin password
-is the one from `homelab.env`, or a generated one in
-`/root/homelab-credentials.txt`.
+Open `http://<box>/` for the homelable map and `http://<box>/grafana/` for
+the dashboards. Both log in as `admin` with the passwords from `homelab.env`
+(`HOMELABLE_ADMIN_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`) or generated ones in
+`/root/homelab-credentials.txt`. Until the first boot has run, both addresses
+show a "not configured" page.
 
 ### Security model
 
@@ -51,7 +53,10 @@ is the one from `homelab.env`, or a generated one in
 - Console: no automatic login. Without `homelab.env` the only way in is the
   console as root with Armbian's initial password `1234`, which must be
   changed at once; SSH stays closed until a key is configured.
-- Network: Grafana, VictoriaMetrics and node_exporter listen on localhost;
+- Web UIs: Grafana and homelable start only after the first boot has set
+  their admin passwords and secret key — never with upstream defaults
+  (`admin`/`admin`).
+- Network: Grafana, homelable, VictoriaMetrics and node_exporter listen on localhost;
   nginx on port 80 and SSH accept connections only from the networks in
   `LAN_CIDR` (default: private ranges).
 - Updates: Debian security updates install automatically; kernel and

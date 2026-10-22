@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the MKS Pi image from source with the Armbian framework pinned in
 # sources.lock. Linux only (Ubuntu 24.04 host, as on GitHub runners); needs
-# sudo and roughly 40 GB of free disk.
+# sudo, Node.js 22+ and roughly 40 GB of free disk.
 #
 # Usage: scripts/build-image.sh [work-dir]
 #   work-dir defaults to ./.work; outputs land in <work-dir>/out/.
@@ -33,6 +33,10 @@ cp -R "$repo_root/build/userpatches" "$armbian/userpatches"
 for artifact in victoriametrics victoriametrics-license grafana; do
   "$repo_root/scripts/fetch-artifact.sh" "$artifact" "$armbian/userpatches/overlay/downloads"
 done
+
+# homelable: backend, web UI built here (needs ~1.5 GB RAM and Node.js 22+),
+# pinned Python dependency locks.
+"$repo_root/scripts/build-homelable.sh" "$armbian/userpatches/overlay/downloads"
 
 # shellcheck disable=SC2054 # "sha,xz" is one value, not two array elements
 build_args=(

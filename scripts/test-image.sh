@@ -61,7 +61,7 @@ check "secrets dir /etc/homelab is 0700" mode_is etc/homelab 700
 check "firewall networks file is 0600" mode_is etc/homelab/nftables-lan.nft 600
 
 # --- Services ------------------------------------------------------------------
-for unit in homelab-firstboot.service victoria-metrics.service grafana-server.service \
+for unit in homelab-firstboot.service victoria-metrics.service grafana-server.service homelable.service \
   nginx.service nftables.service prometheus-node-exporter.service ssh.service \
   unattended-upgrades.service; do
   check "enabled: $unit" enabled "$unit"
@@ -85,6 +85,32 @@ check "grafana: bundled plugin list includes prometheus" has_line usr/share/home
 check "grafana: unused plugins disabled by default" has_line etc/grafana/homelab-plugins.env '^GF_PLUGINS_DISABLE_PLUGINS=.*loki'
 check "grafana: prometheus datasource not disabled" \
   bash -c "! sudo grep -E '^GF_PLUGINS_DISABLE_PLUGINS=(.*,)?prometheus(,|\$)' '$root/etc/grafana/homelab-plugins.env'"
+
+# --- homelable -----------------------------------------------------------------
+u=etc/systemd/system/homelable.service
+check "homelable: backend on localhost" has_line "$u" '--host 127\.0\.0\.1 --port 8000'
+check "homelable: starts only once configured" has_line "$u" '^ConditionPathExists=/etc/homelab/homelable\.env$'
+check "homelable: runs as its own user" has_line "$u" '^User=homelable$'
+check "homelable: no default config baked in" absent etc/homelab/homelable.env
+check "homelable: web UI installed" exists opt/homelable/frontend/dist/index.html
+check "homelable: backend installed" exists opt/homelable/backend/app/main.py
+check "homelable: code is root-owned" owned_by_root opt/homelable
+check "homelable: data dir private" mode_is var/lib/homelable 750
+check "homelable: license and dependency lists" bash -c "sudo test -s '$root/usr/share/doc/homelable/LICENSE' && sudo test -s '$root/usr/share/doc/homelable/python-licenses.txt' && sudo test -s '$root/usr/share/doc/homelable/frontend-licenses.txt'"
+check "homelable: nmap not installed (opt-in)" absent usr/bin/nmap
+# Runs the arm64 interpreter through qemu-user (binfmt), which the Armbian
+# build installs on the runner: proves the venv and the app import cleanly.
+# The app reads its settings at import: a throwaway key, and a database path
+# whose directory exists (the image is mounted read-only).
+homelable_imports() {
+  sudo chroot "$root" /usr/bin/env SECRET_KEY=image-test SQLITE_PATH=/tmp/homelab.db \
+    /opt/homelable/venv/bin/python -c \
+    'import sys; sys.path.insert(0, "/opt/homelable/backend"); import nmap, bcrypt, uvicorn, app.main'
+}
+check "homelable: app imports in the image (arm64 via qemu)" homelable_imports
+check "grafana: starts only once configured" has_line etc/systemd/system/grafana-server.service.d/homelab.conf '^ConditionPathExists=/etc/homelab/grafana-admin\.env$'
+check "nginx: not-configured page until first boot" has_line etc/nginx/sites-available/homelab 'if \(!-f /var/lib/homelab-monitor/configured\)'
+check "no configured marker baked in" absent var/lib/homelab-monitor/configured
 
 # --- Firewall ------------------------------------------------------------------
 check "firewall: inbound policy drop" has_line etc/nftables.conf 'type filter hook input priority filter; policy drop;'

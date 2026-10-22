@@ -25,6 +25,7 @@ hl_reset() {
   HL_TIMEZONE=""
   HL_DATA_DISK_UUID=""
   HL_GRAFANA_ADMIN_PASSWORD=""
+  HL_HOMELABLE_ADMIN_PASSWORD=""
   HL_GRAFANA_PLUGINS=()
   HL_RETENTION="$HL_DEFAULT_RETENTION"
   HL_SCRAPE_INTERVAL="$HL_DEFAULT_SCRAPE_INTERVAL"
@@ -144,15 +145,15 @@ hl_set() {
         hl_error "line $n: DATA_DISK_UUID must be a filesystem UUID (see blkid)"
       fi
       ;;
-    GRAFANA_ADMIN_PASSWORD)
-      if [[ -z "$v" ]]; then
-        HL_GRAFANA_ADMIN_PASSWORD=""
-      elif [[ ${#v} -lt 12 ]]; then
-        hl_error "line $n: GRAFANA_ADMIN_PASSWORD must be at least 12 characters (or empty to generate one)"
-      elif [[ ! "$v" =~ ^[!-~]+$ ]]; then
-        hl_error "line $n: GRAFANA_ADMIN_PASSWORD may only contain printable ASCII without spaces"
-      else
+    GRAFANA_ADMIN_PASSWORD | HOMELABLE_ADMIN_PASSWORD)
+      if [[ -n "$v" && ${#v} -lt 12 ]]; then
+        hl_error "line $n: $key must be at least 12 characters (or empty to generate one)"
+      elif [[ -n "$v" && ! "$v" =~ ^[!-~]+$ ]]; then
+        hl_error "line $n: $key may only contain printable ASCII without spaces"
+      elif [[ "$key" == GRAFANA_ADMIN_PASSWORD ]]; then
         HL_GRAFANA_ADMIN_PASSWORD="$v"
+      else
+        HL_HOMELABLE_ADMIN_PASSWORD="$v"
       fi
       ;;
     GRAFANA_PLUGINS)

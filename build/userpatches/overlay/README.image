@@ -4,7 +4,8 @@ homelab-monitor
 Source, documentation and licenses: https://github.com/badutis/homelab-monitor
 
 Services (all on this box):
-  nginx                      :80 (LAN only)  /grafana/ -> Grafana
+  nginx                      :80 (LAN only)  / -> homelable, /grafana/ -> Grafana
+  homelable                  127.0.0.1:8000  data in /var/lib/homelable
   grafana-server             127.0.0.1:3000
   victoria-metrics           127.0.0.1:8428  data in /var/lib/victoria-metrics
   prometheus-node-exporter   127.0.0.1:9100
@@ -16,8 +17,13 @@ Configuration:
   sudo homelabctl check      validate it
   sudo homelabctl apply      apply TARGET, LAN_CIDR, RETENTION, SCRAPE_INTERVAL
   /root/homelab-credentials.txt
-                             generated Grafana admin password (if none was set)
+                             generated Grafana/homelable admin passwords (if
+                             none were set)
+  /etc/homelab/homelable.env homelable secret key and admin password hash
 
 Login: SSH with the key from homelab.env only; no passwords, no root login.
+Grafana and homelable start only after homelab.env has been applied.
+Network discovery in homelable needs nmap, which is not installed
+("sudo apt install nmap" adds it; mind its license, NPSL).
 Without homelab.env: log in on the console as root (password 1234, Armbian
 asks for a new one at once); SSH stays closed until a key is configured.

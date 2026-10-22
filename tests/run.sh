@@ -227,6 +227,8 @@ env_case 1 "control character" "${base}HOSTNAME=a"$'\x01'"b"$'\n' "control chara
 env_case 1 "short Grafana password" "${base}GRAFANA_ADMIN_PASSWORD=short"$'\n' "at least 12"
 env_case 1 "Grafana password with space" \
   "${base}GRAFANA_ADMIN_PASSWORD=\"long enough pass\""$'\n' "printable ASCII"
+env_case 1 "short homelable password" "${base}HOMELABLE_ADMIN_PASSWORD=short"$'\n' "HOMELABLE_ADMIN_PASSWORD must be at least 12"
+env_case 0 "homelable password accepted" "${base}HOMELABLE_ADMIN_PASSWORD=Long-enough-1234"$'\n'
 env_case 1 "bad LAN_CIDR" "${base}LAN_CIDR=192.0.2.0/33"$'\n' "LAN_CIDR must be"
 env_case 1 "scrape interval below 5s" "${base}SCRAPE_INTERVAL=1s"$'\n' "at least 5s"
 env_case 1 "bad retention" "${base}RETENTION=forever"$'\n' "RETENTION must be"
