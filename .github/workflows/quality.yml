@@ -1,0 +1,70 @@
+name: quality
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install linters
+        env:
+          SHFMT_VERSION: 3.14.1
+          SHFMT_SHA256: 76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          ZIZMOR_URL: https://files.pythonhosted.org/packages/7c/f7/ee2c8eedc7bf07f443a41aa12f828c7846fd17bab184c22403afd0cbb137/zizmor-1.31.1-py3-none-manylinux_2_28_x86_64.whl
+          ZIZMOR_SHA256: 58e878eb2dbd2c6183c105e1ac28c14f7dd1eca44a783f1fe2a69647d012c410
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          cd "$RUNNER_TEMP"
+
+          curl -fsSL -o shfmt "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64"
+          echo "${SHFMT_SHA256}  shfmt" | sha256sum -c -
+          install -m 0755 shfmt bin/shfmt
+
+          f="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "$f" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$f"
+          echo "${ACTIONLINT_SHA256}  $f" | sha256sum -c -
+          tar -xzf "$f" actionlint
+          install -m 0755 actionlint bin/actionlint
+
+          w="$(basename "$ZIZMOR_URL")"
+          curl -fsSL -o "$w" "$ZIZMOR_URL"
+          echo "${ZIZMOR_SHA256}  $w" | sha256sum -c -
+          python3 -m venv zizmor-venv
+          zizmor-venv/bin/pip install --quiet --no-deps "./$w"
+          ln -s "$RUNNER_TEMP/zizmor-venv/bin/zizmor" bin/zizmor
+
+          echo "$RUNNER_TEMP/bin" >>"$GITHUB_PATH"
+
+      - name: shellcheck
+        run: shellcheck -x scripts/*.sh tests/*.sh
+
+      - name: shfmt (style from .editorconfig)
+        run: shfmt -d scripts tests
+
+      - name: actionlint
+        run: actionlint
+
+      - name: zizmor (GitHub Actions security)
+        run: zizmor --offline --format plain .github/workflows
+
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Script tests
+        run: tests/run.sh

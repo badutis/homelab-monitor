@@ -79,9 +79,20 @@ Branches:
 - `main` — released, verified code only. It moves forward (fast-forward only)
   to a `develop` commit whose leak check **and** image build have passed.
 
-Every pull request runs a leak check (`gitleaks` plus a grep for private IPv4
-ranges and MAC addresses). Run it locally before pushing:
+Every pull request runs:
+
+- **leak check** — `gitleaks` plus a scan of files, commit messages and PR text
+  for private IPv4 ranges, MAC addresses and internal host names;
+- **quality** — `shellcheck`, `shfmt` (style in `.editorconfig`), `actionlint`,
+  `zizmor` (GitHub Actions security) and the script tests;
+- **image build** — when the build inputs change.
+
+Run the same checks locally before pushing:
 
 ```bash
 scripts/leak-check.sh
+tests/run.sh
+shellcheck -x scripts/*.sh tests/*.sh && shfmt -d scripts tests && actionlint && zizmor --offline .github/workflows
 ```
+
+Security issues: see [`SECURITY.md`](SECURITY.md).
