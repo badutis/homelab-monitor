@@ -107,17 +107,23 @@ check "homelable: license and dependency lists" bash -c "sudo test -s '$root/usr
 check "homelable: nmap installed for network discovery" exists usr/bin/nmap
 # Runs the arm64 interpreter through qemu-user (binfmt), which the Armbian
 # build installs on the runner: proves the venv and the app import cleanly.
-# The app reads its settings at import: a throwaway key, and a database path
-# whose directory exists (the image is mounted read-only).
+# The app reads its settings at import (a throwaway key and database path)
+# and creates a temporary file, so /tmp gets a tmpfs: the image itself is
+# mounted read-only, while on the board /tmp is writable.
 homelable_imports() {
   # Diagnostics for a failure: is arm64 emulation registered on the host?
   if [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
     echo "qemu-aarch64 binfmt is not registered on this host"
     ls /proc/sys/fs/binfmt_misc/ 2>&1 || true
   fi
+  sudo mount -t tmpfs -o size=64m tmpfs "$root/tmp"
+  local rc=0
   sudo chroot "$root" /usr/bin/env SECRET_KEY=image-test SQLITE_PATH=/tmp/homelab.db \
     /opt/homelable/venv/bin/python -c \
-    'import sys; sys.path.insert(0, "/opt/homelable/backend"); import nmap, bcrypt, uvicorn, app.main'
+    'import sys; sys.path.insert(0, "/opt/homelable/backend"); import nmap, bcrypt, uvicorn, app.main' ||
+    rc=$?
+  sudo umount "$root/tmp"
+  return "$rc"
 }
 check "homelable: app imports in the image (arm64 via qemu)" homelable_imports
 check "grafana: starts only once configured" has_line etc/systemd/system/grafana-server.service.d/homelab.conf '^ConditionPathExists=/etc/homelab/grafana-admin\.env$'
