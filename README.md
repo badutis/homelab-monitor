@@ -13,7 +13,7 @@ RK3328, 1 GB RAM) into a small, self-contained monitoring box for a homelab.
 | Armbian Debian Trixie minimal, kernel `current` | [`redrathnure/armbian-mkspi`](https://github.com/redrathnure/armbian-mkspi), built from source | kernel and u-boot frozen (`BSPFREEZE=yes`) |
 | [homelable](https://github.com/Pouzor/homelable) | pinned tag, no Docker | Python venv + systemd + nginx; the web UI is built in CI, not on the board |
 | [VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics) single-node | official `linux-arm64` release, SHA256-pinned | metrics storage, `127.0.0.1:8428`; data ideally on a separate disk |
-| [Grafana OSS](https://github.com/grafana/grafana) | official `arm64` package, SHA256-pinned, held | dashboards and alerts at `/grafana/`, dark theme, no plugin downloads or telemetry |
+| [Grafana OSS](https://github.com/grafana/grafana) | official `arm64` package, SHA256-pinned, held | dashboards and alerts at `/grafana/`, dark theme, no plugin downloads or telemetry; only the Prometheus datasource is loaded by default, other bundled datasources via `GRAFANA_PLUGINS` |
 | `prometheus-node-exporter` | Debian package | metrics of this box, `127.0.0.1:9100` |
 | nginx, nftables | Debian packages | single entry point on port 80; inbound SSH/HTTP from the LAN only |
 | homelab-monitor glue | this repository | first-boot setup, scrape config generator, dashboards, firewall |
@@ -86,8 +86,10 @@ archive of the pinned framework, build logs and `BUILD-INFO.txt`.
 
 CI also scans every built image with [Trivy](https://github.com/aquasecurity/trivy)
 (`scripts/scan-image.sh`): a vulnerability report for the installed Debian
-packages (`trivy-report.json`, summary in the job summary) and a CycloneDX
-SBOM (`sbom.cdx.json`). The scan reports; it does not fail the build yet.
+packages and the bundled binaries (`trivy-report.json`; the job summary
+breaks it down by source: Debian, Grafana, its bundled plugins — loaded or
+not — and VictoriaMetrics) and a CycloneDX SBOM (`sbom.cdx.json`). The scan
+reports; it does not fail the build yet.
 
 ## Pinned sources
 
