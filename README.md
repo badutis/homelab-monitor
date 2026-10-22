@@ -54,6 +54,11 @@ scripts/build-image.sh
 Outputs land in `.work/out/`: the `.img.xz` image and its checksum, the source
 archive of the pinned framework, build logs and `BUILD-INFO.txt`.
 
+CI also scans every built image with [Trivy](https://github.com/aquasecurity/trivy)
+(`scripts/scan-image.sh`): a vulnerability report for the installed Debian
+packages (`trivy-report.json`, summary in the job summary) and a CycloneDX
+SBOM (`sbom.cdx.json`). The scan reports; it does not fail the build yet.
+
 ## Pinned sources
 
 Upstream components are pinned in [`sources.lock`](sources.lock) by tag **and**
