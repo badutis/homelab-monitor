@@ -27,7 +27,10 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 fail=0
-report() { printf 'LEAK: %s\n' "$*" >&2; fail=1; }
+report() {
+  printf 'LEAK: %s\n' "$*" >&2
+  fail=1
+}
 
 # Private IPv4: 10/8, 172.16/12, 192.168/16, 100.64/10 (CGNAT, also used by VPNs).
 ip_re='(^|[^0-9.])(10\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])|192\.168|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7]))\.[0-9]{1,3}\.[0-9]{1,3}([^0-9]|$)'
@@ -65,8 +68,8 @@ fi
 # 2. Files. Strip the allowed bare ranges first, then match what is left.
 scan_files() {
   local name="$1" re="$2" hits
-  hits="$(git grep -nIE --untracked "$re" -- . 2>/dev/null \
-    | sed -E "s#${allowed_ranges}##g" | grep -E "$re" || true)"
+  hits="$(git grep -nIE --untracked "$re" -- . 2>/dev/null |
+    sed -E "s#${allowed_ranges}##g" | grep -E "$re" || true)"
   if [ -n "$hits" ]; then
     printf '%s\n' "$hits" >&2
     report "$name found in files"
@@ -103,7 +106,7 @@ if git rev-parse --verify -q HEAD >/dev/null; then
       fi
     done)"
     if [ -n "$commits" ]; then
-      printf 'commit %s\n' $commits >&2
+      printf '%s\n' "$commits" | sed 's/^/commit /' >&2
       report "denylisted word found in commit messages or identities (commits above)"
     fi
   fi
