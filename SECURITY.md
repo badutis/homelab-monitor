@@ -28,6 +28,9 @@ Every pull request runs:
 - a leak check (`gitleaks`, private addresses, MAC addresses, host names,
   a private denylist);
 - `shellcheck`, `shfmt`, `actionlint` and `zizmor` (GitHub Actions security);
-- script tests (`tests/run.sh`).
+- script tests (`tests/run.sh`, `tests/image-tools.sh`).
+
+Every built image is scanned with Trivy (vulnerability report and CycloneDX
+SBOM, published as build artifacts).
 
 All third-party actions are pinned by commit SHA and updated by Dependabot.

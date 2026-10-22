@@ -50,6 +50,15 @@ jobs:
       - name: Build image
         run: scripts/build-image.sh /mnt/work
 
+      - name: Install Trivy
+        run: scripts/install-trivy.sh
+
+      - name: Scan image (report only)
+        run: |
+          image="$(ls /mnt/work/out/*.img.xz)"
+          scripts/scan-image.sh "$image" /mnt/work/out
+          cat /mnt/work/out/trivy-summary.md >>"$GITHUB_STEP_SUMMARY"
+
       - name: Disk usage after build
         if: always()
         run: df -h / /mnt
@@ -73,6 +82,9 @@ jobs:
             /mnt/work/out/*.img.xz.sha
             /mnt/work/out/armbian-mkspi-src.tar.gz
             /mnt/work/out/BUILD-INFO.txt
+            /mnt/work/out/trivy-report.json
+            /mnt/work/out/trivy-summary.md
+            /mnt/work/out/sbom.cdx.json
           compression-level: 0
           retention-days: 14
 
