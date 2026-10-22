@@ -24,13 +24,20 @@ bad() {
   echo "FAIL $1"
   failed=$((failed + 1))
 }
+# check <description> <command...>: on failure, show the command's output.
 check() {
-  local desc="$1"
+  local desc="$1" out
   shift
-  if "$@" >/dev/null 2>&1; then ok "$desc"; else bad "$desc"; fi
+  if out="$("$@" 2>&1)"; then
+    ok "$desc"
+  else
+    bad "$desc"
+    [ -z "$out" ] || printf '%s\n' "$out" | tail -n 15 | sed 's/^/     | /'
+  fi
 }
-has_line() { sudo grep -qE "$2" "$root/$1"; }
-no_line() { ! sudo grep -qE "$2" "$root/$1"; }
+# -e: patterns may start with "-".
+has_line() { sudo grep -qE -e "$2" "$root/$1"; }
+no_line() { ! sudo grep -qE -e "$2" "$root/$1"; }
 exists() { sudo test -e "$root/$1"; }
 absent() { ! sudo test -e "$root/$1"; }
 enabled() { sudo find "$root/etc/systemd/system" -path "*.wants/$1" | grep -q .; }
@@ -103,6 +110,11 @@ check "homelable: nmap installed for network discovery" exists usr/bin/nmap
 # The app reads its settings at import: a throwaway key, and a database path
 # whose directory exists (the image is mounted read-only).
 homelable_imports() {
+  # Diagnostics for a failure: is arm64 emulation registered on the host?
+  if [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
+    echo "qemu-aarch64 binfmt is not registered on this host"
+    ls /proc/sys/fs/binfmt_misc/ 2>&1 || true
+  fi
   sudo chroot "$root" /usr/bin/env SECRET_KEY=image-test SQLITE_PATH=/tmp/homelab.db \
     /opt/homelable/venv/bin/python -c \
     'import sys; sys.path.insert(0, "/opt/homelable/backend"); import nmap, bcrypt, uvicorn, app.main'
