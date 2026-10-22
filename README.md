@@ -58,6 +58,13 @@ source archives (Armbian/kernel/u-boot, Grafana) next to the image.
 
 ## Contributing
 
+Branches:
+
+- `develop` — default branch; every change lands here through a pull request
+  with a green leak check.
+- `main` — released, verified code only. It moves forward (fast-forward only)
+  to a `develop` commit whose leak check **and** image build have passed.
+
 Every pull request runs a leak check (`gitleaks` plus a grep for private IPv4
 ranges and MAC addresses). Run it locally before pushing:
 
