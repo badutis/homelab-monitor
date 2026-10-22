@@ -10,3 +10,6 @@ homelab.env
 
 # Local build work directory
 /.work/
+
+# Local, per-developer notes for coding assistants
+CLAUDE.md
