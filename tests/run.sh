@@ -144,5 +144,93 @@ expect 1 "fetch-source: missing commit= fails" \
 expect 1 "fetch-source: unknown component fails" \
   "$fs/scripts/fetch-source.sh" nope --verify-only
 
+# --- fetch-artifact.sh -----------------------------------------------------
+
+fa="$tmp/fa"
+mkdir -p "$fa/files"
+cp -R "$repo_root/scripts" "$fa/"
+printf 'payload\n' >"$fa/files/artifact.bin"
+good_sha="$( (sha256sum "$fa/files/artifact.bin" 2>/dev/null || shasum -a 256 "$fa/files/artifact.bin") | cut -d' ' -f1)"
+zeros="0000000000000000000000000000000000000000000000000000000000000000"
+cat >"$fa/sources.lock" <<EOF
+good      url=file://$fa/files/artifact.bin  sha256=$good_sha
+wrong     url=file://$fa/files/artifact.bin  sha256=$zeros
+short     url=file://$fa/files/artifact.bin  sha256=abc
+no-sha    url=file://$fa/files/artifact.bin
+EOF
+expect 0 "fetch-artifact: matching sha256 is kept" "$fa/scripts/fetch-artifact.sh" good "$tmp/fa-out"
+if [ -f "$tmp/fa-out/artifact.bin" ]; then
+  ok "fetch-artifact: file saved under its URL name"
+else
+  not_ok "fetch-artifact: file saved under its URL name"
+fi
+expect 1 "fetch-artifact: wrong sha256 fails" "$fa/scripts/fetch-artifact.sh" wrong "$tmp/fa-bad"
+if [ -e "$tmp/fa-bad/artifact.bin" ] || [ -e "$tmp/fa-bad/artifact.bin.part" ]; then
+  not_ok "fetch-artifact: mismatching file is deleted"
+else
+  ok "fetch-artifact: mismatching file is deleted"
+fi
+expect 1 "fetch-artifact: malformed sha256 fails" "$fa/scripts/fetch-artifact.sh" short "$tmp/fa-bad"
+expect 1 "fetch-artifact: missing sha256 fails" "$fa/scripts/fetch-artifact.sh" no-sha "$tmp/fa-bad"
+
+# --- homelab.env parsing and rendering (image library) -----------------------
+
+lib="$repo_root/build/userpatches/overlay/rootfs/usr/local/lib/homelab/homelab.sh"
+key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForUnitTestsOnly000000000000000000 t@example.invalid"
+env_n=0
+
+# env_case <0|1> <description> <file content> [extended regex expected in output]
+env_case() {
+  local want="$1" desc="$2" content="$3" pattern="${4:-}"
+  env_n=$((env_n + 1))
+  local f="$tmp/env.$env_n"
+  printf '%s' "$content" >"$f"
+  expect "$want" "env: $desc" "$repo_root/tests/env-case.sh" "$lib" "$f"
+  if [ -n "$pattern" ]; then
+    if grep -qE -- "$pattern" "$tmp/out"; then
+      ok "env: $desc (output)"
+    else
+      not_ok "env: $desc (output)"
+      sed 's/^/     | /' "$tmp/out"
+    fi
+  fi
+}
+
+base="HOMELAB_USER=admin"$'\n'"HOMELAB_SSH_KEY=\"$key\""$'\n'
+
+env_case 0 "example file is valid" "$(cat "$repo_root/homelab.env.example")" "name: 'rack-controller'"
+env_case 0 "minimal file is valid" "$base" "job_name: homelab_monitor"
+env_case 0 "default LAN networks" "$base" 'define LAN_V4 = \{ 10\.0\.0\.0/8, 172\.16\.0\.0/12, 192\.168\.0\.0/16 \}'
+env_case 0 "LAN_CIDR replaces the defaults" "${base}LAN_CIDR=192.0.2.0/24"$'\n' 'define LAN_V4 = \{ 192\.0\.2\.0/24 \}'
+env_case 0 "IPv6-only LAN keeps IPv4 closed" "${base}LAN_CIDR=2001:db8::/32"$'\n' 'define LAN_V4 = \{ 127\.0\.0\.1/32 \}'
+env_case 0 "CRLF line endings" "HOMELAB_USER=admin"$'\r\n'"HOMELAB_SSH_KEY=\"$key\""$'\r\n'
+env_case 0 "targets grouped by job with path" \
+  "${base}TARGET=node a 192.0.2.1:9100"$'\n'"TARGET=app b app.example.invalid:8080 /probe"$'\n' \
+  "__metrics_path__: '/probe'"
+env_case 0 "IPv6 target" "${base}TARGET=node v6 [2001:db8::1]:9100"$'\n' '\[2001:db8::1\]:9100'
+env_case 0 "retention and interval" "${base}RETENTION=90d"$'\n'"SCRAPE_INTERVAL=15s"$'\n' "scrape_interval: 15s"
+env_case 1 "missing user and key" "HOSTNAME=x"$'\n' "HOMELAB_USER is required"
+env_case 1 "reserved user root" "HOMELAB_USER=root"$'\n'"HOMELAB_SSH_KEY=\"$key\""$'\n' "reserved"
+env_case 1 "private key instead of public" \
+  "${base}HOMELAB_SSH_KEY=-----BEGIN OPENSSH PRIVATE KEY-----"$'\n' "not a single OpenSSH public key"
+env_case 1 "unknown setting" "${base}PERMIT_ROOT=yes"$'\n' "unknown setting PERMIT_ROOT"
+env_case 1 "lowercase key" "${base}hostname=x"$'\n' "expected KEY=value"
+env_case 1 "command substitution in a value" "${base}HOSTNAME=\$(reboot)"$'\n' "HOSTNAME must be"
+env_case 1 "quote injection in target path" "${base}TARGET=node a 192.0.2.1:80 /m'x"$'\n' "TARGET path"
+env_case 1 "port 0" "${base}TARGET=node a 192.0.2.1:0"$'\n' "port 1-65535"
+env_case 1 "port 65536" "${base}TARGET=node a 192.0.2.1:65536"$'\n' "port 1-65535"
+env_case 1 "duplicate target name" \
+  "${base}TARGET=node a 192.0.2.1:9100"$'\n'"TARGET=app a 192.0.2.2:80"$'\n' "used twice"
+env_case 1 "reserved job" "${base}TARGET=homelab_monitor a 192.0.2.1:9100"$'\n' "reserved"
+env_case 1 "too many target fields" "${base}TARGET=node a 192.0.2.1:9100 /metrics extra"$'\n' "must be '<job>"
+env_case 1 "control character" "${base}HOSTNAME=a"$'\x01'"b"$'\n' "control characters"
+env_case 1 "short Grafana password" "${base}GRAFANA_ADMIN_PASSWORD=short"$'\n' "at least 12"
+env_case 1 "Grafana password with space" \
+  "${base}GRAFANA_ADMIN_PASSWORD=\"long enough pass\""$'\n' "printable ASCII"
+env_case 1 "bad LAN_CIDR" "${base}LAN_CIDR=192.0.2.0/33"$'\n' "LAN_CIDR must be"
+env_case 1 "scrape interval below 5s" "${base}SCRAPE_INTERVAL=1s"$'\n' "at least 5s"
+env_case 1 "bad retention" "${base}RETENTION=forever"$'\n' "RETENTION must be"
+env_case 1 "path traversal in time zone" "${base}TIMEZONE=../../etc/passwd"$'\n' "TIMEZONE must"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
