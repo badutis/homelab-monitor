@@ -21,14 +21,15 @@ fi
 
 # Kernel version is pinned in sources.lock; verify the tag before building.
 "$repo_root/scripts/fetch-source.sh" linux --verify-only
-kernel_tag="$(grep -E '^linux[[:space:]]' "$repo_root/sources.lock" \
-  | tr -s '[:space:]' '\n' | sed -n 's/^tag=//p')"
+kernel_tag="$(grep -E '^linux[[:space:]]' "$repo_root/sources.lock" |
+  tr -s '[:space:]' '\n' | sed -n 's/^tag=//p')"
 
 # Our additions go in through the framework's own userpatches mechanism; the
 # framework itself is never modified.
 rm -rf "$armbian/userpatches"
 cp -R "$repo_root/build/userpatches" "$armbian/userpatches"
 
+# shellcheck disable=SC2054 # "sha,xz" is one value, not two array elements
 build_args=(
   BOARD=mkspi
   BRANCH=current
