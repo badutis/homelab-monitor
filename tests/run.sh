@@ -232,5 +232,31 @@ env_case 1 "scrape interval below 5s" "${base}SCRAPE_INTERVAL=1s"$'\n' "at least
 env_case 1 "bad retention" "${base}RETENTION=forever"$'\n' "RETENTION must be"
 env_case 1 "path traversal in time zone" "${base}TIMEZONE=../../etc/passwd"$'\n' "TIMEZONE must"
 
+# Grafana bundled plugins (the ids Grafana 13.2 ships).
+plugins="$tmp/grafana-bundled-plugins"
+printf '%s\n' elasticsearch grafana-postgresql-datasource grafana-pyroscope-datasource influxdb \
+  jaeger loki mssql mysql opentsdb prometheus stackdriver tempo zipkin >"$plugins"
+
+# plugins_case <0|1> <description> <file content> <extended regex expected in output>
+plugins_case() {
+  env_n=$((env_n + 1))
+  local f="$tmp/env.$env_n"
+  printf '%s' "$3" >"$f"
+  expect "$1" "grafana plugins: $2" "$repo_root/tests/env-case.sh" "$lib" "$f" "$plugins"
+  if grep -qE -- "$4" "$tmp/out"; then
+    ok "grafana plugins: $2 (output)"
+  else
+    not_ok "grafana plugins: $2 (output)"
+    sed 's/^/     | /' "$tmp/out"
+  fi
+}
+all_but_prometheus="elasticsearch,grafana-postgresql-datasource,grafana-pyroscope-datasource,influxdb,jaeger,loki,mssql,mysql,opentsdb,stackdriver,tempo,zipkin"
+plugins_case 0 "default loads only prometheus" "$base" "^GF_PLUGINS_DISABLE_PLUGINS=${all_but_prometheus}\$"
+plugins_case 0 "GRAFANA_PLUGINS enables more" "${base}GRAFANA_PLUGINS=loki,mysql"$'\n' \
+  '^GF_PLUGINS_DISABLE_PLUGINS=elasticsearch,grafana-postgresql-datasource,grafana-pyroscope-datasource,influxdb,jaeger,mssql,opentsdb,stackdriver,tempo,zipkin$'
+plugins_case 0 "prometheus can not be disabled" "${base}GRAFANA_PLUGINS="$'\n' "^GF_PLUGINS_DISABLE_PLUGINS=${all_but_prometheus}\$"
+plugins_case 1 "unknown plugin id" "${base}GRAFANA_PLUGINS=loki,not-a-plugin"$'\n' "'not-a-plugin' is not a bundled plugin"
+plugins_case 1 "bad list format" "${base}GRAFANA_PLUGINS=loki mysql"$'\n' "comma-separated list"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

@@ -78,6 +78,13 @@ check "node_exporter on localhost" has_line etc/default/prometheus-node-exporter
 check "nginx: only our site enabled" bash -c "[ \"\$(sudo ls '$root/etc/nginx/sites-enabled')\" = homelab ]"
 check "grafana: no plugin downloads at start" has_line etc/systemd/system/grafana-server.service.d/homelab.conf '^Environment=GF_PLUGINS_PREINSTALL_DISABLED=true$'
 check "grafana: no anonymous access" has_line etc/systemd/system/grafana-server.service.d/homelab.conf '^Environment=GF_AUTH_ANONYMOUS_ENABLED=false$'
+check "grafana: packaged read-only bundled plugins" has_line etc/systemd/system/grafana-server.service.d/homelab.conf '^Environment=GF_PATHS_BUNDLED_PLUGINS=/usr/share/grafana/data/plugins-bundled$'
+check "grafana: no plugin auto-updates" has_line etc/systemd/system/grafana-server.service.d/homelab.conf '^Environment=GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false$'
+check "grafana: no writable copy of bundled plugins" absent var/lib/grafana/plugins-bundled
+check "grafana: bundled plugin list includes prometheus" has_line usr/share/homelab/grafana-bundled-plugins '^prometheus$'
+check "grafana: unused plugins disabled by default" has_line etc/grafana/homelab-plugins.env '^GF_PLUGINS_DISABLE_PLUGINS=.*loki'
+check "grafana: prometheus datasource not disabled" \
+  bash -c "! sudo grep -E '^GF_PLUGINS_DISABLE_PLUGINS=(.*,)?prometheus(,|\$)' '$root/etc/grafana/homelab-plugins.env'"
 
 # --- Firewall ------------------------------------------------------------------
 check "firewall: inbound policy drop" has_line etc/nftables.conf 'type filter hook input priority filter; policy drop;'
