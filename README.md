@@ -12,9 +12,10 @@ RK3328, 1 GB RAM) into a small, self-contained monitoring box for a homelab.
 |---|---|---|
 | Armbian Debian Trixie minimal, kernel `current` | [`redrathnure/armbian-mkspi`](https://github.com/redrathnure/armbian-mkspi), built from source | kernel and u-boot frozen (`BSPFREEZE=yes`) |
 | [homelable](https://github.com/Pouzor/homelable) | pinned tag, no Docker | Python venv + systemd + nginx; the web UI is built in CI, not on the board |
-| [VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics) single-node | official `linux-arm64` release | metrics storage, on a separate data disk |
-| [Grafana OSS](https://github.com/grafana/grafana) | official apt repository, pinned | dashboards and alerts |
-| `prometheus-node-exporter` | Debian package | board metrics and sensors via `hwmon` |
+| [VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics) single-node | official `linux-arm64` release, SHA256-pinned | metrics storage, `127.0.0.1:8428`; data ideally on a separate disk |
+| [Grafana OSS](https://github.com/grafana/grafana) | official `arm64` package, SHA256-pinned, held | dashboards and alerts at `/grafana/`, dark theme, no plugin downloads or telemetry |
+| `prometheus-node-exporter` | Debian package | metrics of this box, `127.0.0.1:9100` |
+| nginx, nftables | Debian packages | single entry point on port 80; inbound SSH/HTTP from the LAN only |
 | homelab-monitor glue | this repository | first-boot setup, scrape config generator, dashboards, firewall |
 
 Hardware features on the MKS Pi GPIO header — DS18B20 1-Wire temperature
@@ -22,10 +23,39 @@ sensors and fan control — are planned for a later stage, after `v1.0.0`.
 
 ## Configuration
 
-The image contains **no addresses, keys or host names**. After flashing, you
-create `homelab.env` on the FAT `/boot` partition (an example file will be
-provided as `homelab.env.example`). On first boot it is moved to
-`/etc/homelab/` and removed from `/boot`.
+The image contains **no addresses, keys or host names**. After flashing,
+copy [`homelab.env.example`](homelab.env.example) to the FAT boot partition
+of the card as `homelab.env` and edit it (login user, SSH key, machines to
+monitor, optional data disk and time zone).
+
+On the first boot that finds it, `homelab-firstboot`:
+
+1. validates the file — it is parsed, never executed; unknown keys or bad
+   values stop everything and the reasons are written to
+   `homelab.env.error` on the same partition;
+2. creates the user with the SSH key(s), locks all passwords (root included);
+3. sets host name, time zone and the metrics disk;
+4. generates the scrape configuration and firewall networks;
+5. moves the settings to `/etc/homelab/homelab.env` (root only) and deletes
+   `homelab.env` from the card.
+
+Later changes: edit `/etc/homelab/homelab.env`, then `sudo homelabctl apply`.
+
+Open `http://<box>/` (redirects to `/grafana/`). The Grafana admin password
+is the one from `homelab.env`, or a generated one in
+`/root/homelab-credentials.txt`.
+
+### Security model
+
+- SSH: public key only, no root login, no passwords.
+- Console: no automatic login. Without `homelab.env` the only way in is the
+  console as root with Armbian's initial password `1234`, which must be
+  changed at once; SSH stays closed until a key is configured.
+- Network: Grafana, VictoriaMetrics and node_exporter listen on localhost;
+  nginx on port 80 and SSH accept connections only from the networks in
+  `LAN_CIDR` (default: private ranges).
+- Updates: Debian security updates install automatically; kernel and
+  u-boot change only with a new image.
 
 Examples in this repository use only documentation addresses
 (`192.0.2.0/24`, `198.51.100.0/24`) and `example.invalid`.

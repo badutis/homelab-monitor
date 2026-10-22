@@ -59,6 +59,13 @@ jobs:
           scripts/scan-image.sh "$image" /mnt/work/out
           cat /mnt/work/out/trivy-summary.md >>"$GITHUB_STEP_SUMMARY"
 
+      - name: Test image configuration
+        run: |
+          set -o pipefail
+          image="$(ls /mnt/work/out/*.img.xz)"
+          scripts/with-image-rootfs.sh "$image" scripts/test-image.sh | tee /mnt/work/out/image-tests.txt
+          { echo '### Image configuration tests'; echo '```'; tail -n 1 /mnt/work/out/image-tests.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
+
       - name: Disk usage after build
         if: always()
         run: df -h / /mnt
@@ -85,6 +92,7 @@ jobs:
             /mnt/work/out/trivy-report.json
             /mnt/work/out/trivy-summary.md
             /mnt/work/out/sbom.cdx.json
+            /mnt/work/out/image-tests.txt
           compression-level: 0
           retention-days: 14
 

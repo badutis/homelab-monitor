@@ -10,3 +10,6 @@ homelab.env
 
 # Local build work directory
 /.work/
+
+# Release artifacts fetched at build time
+/build/userpatches/overlay/downloads/

@@ -1,0 +1,40 @@
+[Unit]
+Description=VictoriaMetrics single-node time series database
+Documentation=https://docs.victoriametrics.com/
+After=network-online.target local-fs.target
+Wants=network-online.target
+RequiresMountsFor=/var/lib/victoria-metrics
+
+[Service]
+Type=simple
+User=victoriametrics
+Group=victoriametrics
+EnvironmentFile=/etc/victoria-metrics/victoria-metrics.env
+# Listens on localhost only; Grafana is the only client. Memory capped well
+# below the 1 GB of the board, which also runs Grafana and homelable.
+ExecStart=/usr/local/bin/victoria-metrics-prod \
+  -storageDataPath=/var/lib/victoria-metrics \
+  -retentionPeriod=${RETENTION} \
+  -httpListenAddr=127.0.0.1:8428 \
+  -promscrape.config=/etc/victoria-metrics/scrape.yml \
+  -promscrape.config.strictParse \
+  -memory.allowedPercent=20 \
+  -search.maxConcurrentRequests=4
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ReadWritePaths=/var/lib/victoria-metrics
+
+[Install]
+WantedBy=multi-user.target

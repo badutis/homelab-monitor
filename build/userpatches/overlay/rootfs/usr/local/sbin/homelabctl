@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# homelabctl — apply /etc/homelab/homelab.env to the running system.
+#
+#   homelabctl check [file]   validate a homelab.env (default: the installed one)
+#   homelabctl apply          regenerate the scrape config, firewall networks and
+#                             metrics retention, then reload the services
+#                             (HOMELAB_NO_RELOAD=1: write files only)
+#
+# Edit /etc/homelab/homelab.env as root, then run "sudo homelabctl apply".
+# User, SSH keys, host name, time zone and data disk are set on first boot
+# only (homelab-firstboot).
+
+set -euo pipefail
+
+# shellcheck source=../lib/homelab/homelab.sh
+source /usr/local/lib/homelab/homelab.sh
+
+ENV_FILE=/etc/homelab/homelab.env
+SCRAPE_FILE=/etc/victoria-metrics/scrape.yml
+VM_ENV_FILE=/etc/victoria-metrics/victoria-metrics.env
+NFT_LAN_FILE=/etc/homelab/nftables-lan.nft
+
+die() {
+  echo "homelabctl: $*" >&2
+  exit 1
+}
+
+parse_or_die() {
+  if ! hl_parse_env "$1"; then
+    local e
+    for e in "${HL_ERRORS[@]}"; do echo "homelabctl: $1: $e" >&2; done
+    exit 1
+  fi
+}
+
+# Write a file atomically with the given mode; keep the old one if unchanged.
+write_file() {
+  local dest="$1" mode="$2" tmp
+  tmp="$(mktemp "$dest.XXXXXX")"
+  cat >"$tmp"
+  chmod "$mode" "$tmp"
+  if [[ -f "$dest" ]] && cmp -s "$tmp" "$dest"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv -f "$tmp" "$dest"
+}
+
+cmd_check() {
+  parse_or_die "${1:-$ENV_FILE}"
+  echo "ok: ${#HL_TARGETS[@]} target(s), ${#HL_SSH_KEYS[@]} SSH key(s)"
+}
+
+cmd_apply() {
+  [[ $EUID -eq 0 ]] || die "apply must run as root (sudo homelabctl apply)"
+  parse_or_die "$ENV_FILE"
+  local self changed_vm=0 changed_nft=0
+  self="$(hostname)"
+
+  mkdir -p "$(dirname "$SCRAPE_FILE")"
+  hl_render_scrape "$self" | write_file "$SCRAPE_FILE" 0644 && changed_vm=1
+  printf 'RETENTION=%s\n' "$HL_RETENTION" | write_file "$VM_ENV_FILE" 0644 && changed_vm=1
+  hl_render_nft_lan | write_file "$NFT_LAN_FILE" 0600 && changed_nft=1
+
+  # During first boot the services start after us; only check the rules.
+  if [[ "${HOMELAB_NO_RELOAD:-0}" == 1 ]]; then
+    nft -c -f /etc/nftables.conf || die "generated firewall rules do not load"
+    echo "files written; services pick them up when they start"
+    return 0
+  fi
+
+  if ((changed_nft)); then
+    nft -c -f /etc/nftables.conf || die "generated firewall rules do not load; left the running rules unchanged"
+    systemctl reload-or-restart nftables.service
+    echo "firewall: updated"
+  fi
+  if ((changed_vm)); then
+    systemctl restart victoria-metrics.service
+    echo "victoria-metrics: restarted with ${#HL_TARGETS[@]} target(s)"
+  fi
+  ((changed_vm || changed_nft)) || echo "nothing changed"
+}
+
+case "${1:-}" in
+  check) cmd_check "${2:-}" ;;
+  apply) cmd_apply ;;
+  *)
+    sed -n '2,11s/^# \{0,1\}//p' "$0"
+    exit 2
+    ;;
+esac

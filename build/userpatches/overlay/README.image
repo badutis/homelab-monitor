@@ -1,0 +1,23 @@
+homelab-monitor
+===============
+
+Source, documentation and licenses: https://github.com/badutis/homelab-monitor
+
+Services (all on this box):
+  nginx                      :80 (LAN only)  /grafana/ -> Grafana
+  grafana-server             127.0.0.1:3000
+  victoria-metrics           127.0.0.1:8428  data in /var/lib/victoria-metrics
+  prometheus-node-exporter   127.0.0.1:9100
+  nftables                   inbound SSH and HTTP from LAN_CIDR networks only
+
+Configuration:
+  /etc/homelab/homelab.env   settings (root only); copied from /boot/homelab.env
+                             on first boot
+  sudo homelabctl check      validate it
+  sudo homelabctl apply      apply TARGET, LAN_CIDR, RETENTION, SCRAPE_INTERVAL
+  /root/homelab-credentials.txt
+                             generated Grafana admin password (if none was set)
+
+Login: SSH with the key from homelab.env only; no passwords, no root login.
+Without homelab.env: log in on the console as root (password 1234, Armbian
+asks for a new one at once); SSH stays closed until a key is configured.

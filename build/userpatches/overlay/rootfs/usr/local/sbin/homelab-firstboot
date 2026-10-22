@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# homelab-firstboot — apply /boot/homelab.env once, on the first boot that
+# finds it (run by homelab-firstboot.service before SSH and the web services).
+#
+# On success: creates the login user with its SSH keys, locks the root
+# password, sets host name, time zone and data disk, stores the settings in
+# /etc/homelab/homelab.env (root only), runs "homelabctl apply" and deletes
+# /boot/homelab.env. On a validation error nothing is changed and the reasons
+# are written to /boot/homelab.env.error, readable from any computer.
+
+set -euo pipefail
+
+# shellcheck source=../lib/homelab/homelab.sh
+source /usr/local/lib/homelab/homelab.sh
+
+BOOT_ENV=/boot/homelab.env
+BOOT_ERR=/boot/homelab.env.error
+ENV_DIR=/etc/homelab
+CREDENTIALS=/root/homelab-credentials.txt
+VM_DATA=/var/lib/victoria-metrics
+
+log() { echo "homelab-firstboot: $*"; }
+
+[[ -f "$BOOT_ENV" ]] || {
+  log "no $BOOT_ENV, nothing to do"
+  exit 0
+}
+
+if ! hl_parse_env "$BOOT_ENV"; then
+  {
+    echo "homelab.env was NOT applied ($(date -u '+%Y-%m-%d %H:%M UTC')):"
+    printf ' - %s\n' "${HL_ERRORS[@]}"
+    echo "Fix homelab.env on this partition and boot again."
+  } >"$BOOT_ERR"
+  log "invalid $BOOT_ENV, see $BOOT_ERR"
+  cat "$BOOT_ERR" >&2
+  exit 1
+fi
+rm -f "$BOOT_ERR"
+
+install -d -m 0700 "$ENV_DIR"
+install -m 0600 "$BOOT_ENV" "$ENV_DIR/homelab.env"
+
+# --- Login user ---------------------------------------------------------------
+if ! id "$HL_USER" >/dev/null 2>&1; then
+  useradd --create-home --shell /bin/bash --groups sudo "$HL_USER"
+  log "created user $HL_USER"
+fi
+passwd --lock "$HL_USER" >/dev/null # key-only login
+home="$(getent passwd "$HL_USER" | cut -d: -f6)"
+install -d -m 0700 -o "$HL_USER" -g "$HL_USER" "$home/.ssh"
+printf '%s\n' "${HL_SSH_KEYS[@]}" >"$home/.ssh/authorized_keys"
+chown "$HL_USER:$HL_USER" "$home/.ssh/authorized_keys"
+chmod 0600 "$home/.ssh/authorized_keys"
+printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$HL_USER" >"/etc/sudoers.d/90-homelab-$HL_USER"
+chmod 0440 "/etc/sudoers.d/90-homelab-$HL_USER"
+visudo -cq
+
+# Root: no password login at all; Armbian's first-login prompt is not needed.
+passwd --lock root >/dev/null
+rm -f /root/.not_logged_in_yet
+
+# --- Host name and time zone -------------------------------------------------
+if [[ -n "$HL_HOSTNAME" ]]; then
+  old="$(hostname)"
+  echo "$HL_HOSTNAME" >/etc/hostname
+  hostname "$HL_HOSTNAME"
+  sed -i -E "s/^(127\.0\.1\.1[[:space:]]+).*/\1$HL_HOSTNAME/" /etc/hosts
+  grep -qE '^127\.0\.1\.1[[:space:]]' /etc/hosts || echo "127.0.1.1 $HL_HOSTNAME" >>/etc/hosts
+  log "host name $old -> $HL_HOSTNAME"
+fi
+if [[ -n "$HL_TIMEZONE" ]]; then
+  if [[ -f "/usr/share/zoneinfo/$HL_TIMEZONE" ]]; then
+    ln -sf "/usr/share/zoneinfo/$HL_TIMEZONE" /etc/localtime
+    echo "$HL_TIMEZONE" >/etc/timezone
+  else
+    log "unknown time zone $HL_TIMEZONE, keeping $(cat /etc/timezone 2>/dev/null || echo UTC)"
+  fi
+fi
+
+# --- Metrics database on a separate disk ------------------------------------
+if [[ -n "$HL_DATA_DISK_UUID" ]]; then
+  if ! grep -q "UUID=$HL_DATA_DISK_UUID " /etc/fstab; then
+    printf 'UUID=%s %s auto defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2\n' \
+      "$HL_DATA_DISK_UUID" "$VM_DATA" >>/etc/fstab
+  fi
+  install -d "$VM_DATA"
+  systemctl daemon-reload
+  if mount "$VM_DATA"; then
+    log "metrics database on disk $HL_DATA_DISK_UUID"
+  else
+    log "WARNING: disk $HL_DATA_DISK_UUID not mounted; metrics go to the SD card until it is"
+  fi
+fi
+install -d -o victoriametrics -g victoriametrics -m 0750 "$VM_DATA"
+chown victoriametrics:victoriametrics "$VM_DATA"
+
+# --- Grafana admin password ---------------------------------------------------
+# Used by Grafana only when it creates its database on first start.
+password="$HL_GRAFANA_ADMIN_PASSWORD"
+if [[ -z "$password" ]]; then
+  password="$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 24)"
+  umask 077
+  printf 'Grafana user: admin\nGrafana password: %s\n' "$password" >"$CREDENTIALS"
+  log "generated Grafana admin password, stored in $CREDENTIALS"
+fi
+umask 077
+printf 'GF_SECURITY_ADMIN_PASSWORD=%s\n' "$password" >"$ENV_DIR/grafana-admin.env"
+
+# --- Generated config and clean-up ------------------------------------------
+HOMELAB_NO_RELOAD=1 /usr/local/sbin/homelabctl apply || log "WARNING: homelabctl apply failed"
+
+rm -f "$BOOT_ENV"
+date -u '+homelab.env applied %Y-%m-%d %H:%M UTC (settings now in /etc/homelab/homelab.env)' \
+  >/boot/homelab.env.applied
+sync
+log "done"

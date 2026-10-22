@@ -1,0 +1,11 @@
+# Default before first boot configuration: this box only.
+# Replaced by homelabctl from TARGET lines in /etc/homelab/homelab.env.
+global:
+  scrape_interval: 30s
+scrape_configs:
+  - job_name: homelab_monitor
+    static_configs:
+      - targets: ['127.0.0.1:9100']
+        labels: {name: 'homelab-monitor'}
+      - targets: ['127.0.0.1:8428']
+        labels: {name: 'homelab-monitor'}
