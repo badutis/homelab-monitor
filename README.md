@@ -17,12 +17,8 @@ RK3328, 1 GB RAM) into a small, self-contained monitoring box for a homelab.
 | `prometheus-node-exporter` | Debian package | board metrics and sensors via `hwmon` |
 | homelab-monitor glue | this repository | first-boot setup, scrape config generator, dashboards, firewall |
 
-Planned hardware features on the MKS Pi GPIO header:
-
-- **DS18B20** 1-Wire temperature sensors (`w1-gpio` overlay generated from config);
-- **fan control** via software PWM (`pwm-gpio` + `pwm-fan`) or on/off
-  (`gpio-fan`), driven by a small daemon that follows a temperature curve and
-  fails safe to 100 %.
+Hardware features on the MKS Pi GPIO header — DS18B20 1-Wire temperature
+sensors and fan control — are planned for a later stage, after `v1.0.0`.
 
 ## Configuration
 
@@ -39,9 +35,10 @@ Examples in this repository use only documentation addresses
 0. Repository skeleton, pinned sources, leak-check CI.
 1. CI build of a plain Armbian Trixie minimal image from `sources.lock`.
 2. VictoriaMetrics, Grafana, node_exporter, first-boot service.
-3. DS18B20 sensors and fan control.
-4. homelable.
-5. `homelabctl update`, release source archives, `v1.0.0`.
+3. homelable.
+4. `homelabctl update`, release source archives, `v1.0.0`.
+
+Later: hardware stage — DS18B20 sensors and fan control on the GPIO header.
 
 ## Pinned sources
 
