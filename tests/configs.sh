@@ -31,7 +31,7 @@ run() {
 "$repo_root/tests/env-case.sh" "$rootfs/usr/local/lib/homelab/homelab.sh" \
   "$repo_root/homelab.env.example" >"$tmp/rendered"
 sed -n '/^# Generated/,$p' "$tmp/rendered" | awk 'NR>1 && /^# Generated/{exit} {print}' >"$tmp/scrape.yml"
-awk '/^define LAN_V4/{p=1} p' "$tmp/rendered" >"$tmp/lan.nft"
+grep -E '^define LAN_V[46] ' "$tmp/rendered" >"$tmp/lan.nft"
 
 # --- nftables ------------------------------------------------------------------
 nft_check() {

@@ -5,6 +5,7 @@
 # Inputs, prepared by scripts/build-image.sh in /tmp/overlay:
 #   downloads/   release artifacts verified against sources.lock
 #   rootfs/      files copied as-is into /
+#   homelable    built by scripts/build-homelable.sh (in downloads/)
 #
 # Arguments from Armbian: RELEASE LINUXFAMILY BOARD BUILD_DESKTOP ARCH
 
@@ -20,7 +21,8 @@ log "installing packages"
 apt-get update
 apt-get install -y --no-install-recommends \
   prometheus-node-exporter nginx nftables sudo ca-certificates \
-  unattended-upgrades apt-listchanges
+  unattended-upgrades apt-listchanges \
+  python3 python3-venv iputils-ping nmap
 
 log "installing Grafana $(basename "$DL"/grafana_*_arm64.deb)"
 apt-get install -y --no-install-recommends "$DL"/grafana_*_arm64.deb
@@ -36,6 +38,38 @@ if ! id victoriametrics >/dev/null 2>&1; then
     --shell /usr/sbin/nologin victoriametrics
 fi
 install -d -o victoriametrics -g victoriametrics -m 0750 /var/lib/victoria-metrics
+
+log "installing homelable $(tar -xzOf "$DL/homelable-backend.tar.gz" VERSION)"
+if ! id homelable >/dev/null 2>&1; then
+  useradd --system --no-create-home --home-dir /var/lib/homelable \
+    --shell /usr/sbin/nologin homelable
+fi
+install -d -o homelable -g homelable -m 0750 /var/lib/homelable
+install -d -m 0755 /opt/homelable /opt/homelable/frontend
+tar -xzf "$DL/homelable-backend.tar.gz" -C /opt/homelable --no-same-owner
+tar -xzf "$DL/homelable-frontend.tar.gz" -C /opt/homelable/frontend --no-same-owner
+# Python dependencies: every package pinned by SHA256, wheels only; the one
+# source-only package (python-nmap, pure Python) is built with the pinned
+# setuptools without fetching anything else.
+python3 -m venv /opt/homelable/venv
+pip=(/opt/homelable/venv/bin/pip install --no-cache-dir --disable-pip-version-check --require-hashes)
+"${pip[@]}" --only-binary :all: -r "$DL/build-requirements.lock"
+"${pip[@]}" --only-binary :all: --no-binary python-nmap --no-build-isolation -r "$DL/requirements.lock"
+/opt/homelable/venv/bin/python -m compileall -q /opt/homelable/backend/app
+chown -R root:root /opt/homelable
+chmod -R go-w /opt/homelable
+install -D -m 0644 /opt/homelable/LICENSE /usr/share/doc/homelable/LICENSE
+install -m 0644 "$DL/homelable-frontend-licenses.txt" /usr/share/doc/homelable/frontend-licenses.txt
+/opt/homelable/venv/bin/python - >/usr/share/doc/homelable/python-licenses.txt <<'PY'
+from importlib.metadata import distributions
+print("# Python packages in /opt/homelable/venv: name version license")
+for d in sorted(distributions(), key=lambda d: d.metadata["Name"].lower()):
+    m = d.metadata
+    lic = m.get("License-Expression") or m.get("License") or ""
+    if not lic or len(lic) > 60:
+        lic = "; ".join(c.split(" :: ")[-1] for c in m.get_all("Classifier") or [] if c.startswith("License ::")) or "see package"
+    print(f"{m['Name']} {d.version} {lic}")
+PY
 
 log "installing homelab-monitor files"
 # Files are owned by the CI user in the checkout; install them as root.
@@ -95,7 +129,7 @@ CONF
 
 log "enabling services"
 systemctl enable homelab-firstboot.service victoria-metrics.service \
-  grafana-server.service nginx.service nftables.service \
+  grafana-server.service homelable.service nginx.service nftables.service \
   prometheus-node-exporter.service unattended-upgrades.service
 
 # Grafana writes its own database on first start; make sure the build left

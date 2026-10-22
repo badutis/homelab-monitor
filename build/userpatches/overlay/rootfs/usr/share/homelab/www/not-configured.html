@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>homelab-monitor: not configured</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; background: #111; color: #ddd; }
+  code { background: #222; padding: .1rem .3rem; border-radius: 3px; }
+  a { color: #8ab4f8; }
+</style>
+</head>
+<body>
+<h1>homelab-monitor is not configured yet</h1>
+<p>The web services start after the first boot has applied
+<code>homelab.env</code>. Copy <code>homelab.env.example</code> to the boot
+partition of the SD card as <code>homelab.env</code>, edit it and boot again.</p>
+<p>If the file was there, look for <code>homelab.env.error</code> on the same
+partition: it lists what has to be fixed.</p>
+<p><a href="https://github.com/badutis/homelab-monitor">Documentation</a></p>
+</body>
+</html>

@@ -1,0 +1,36 @@
+[Unit]
+Description=homelable homelab map (backend)
+Documentation=https://github.com/Pouzor/homelable
+After=network-online.target homelab-firstboot.service
+Wants=network-online.target
+# Configuration (secret key, admin password hash) is written by
+# homelab-firstboot; without it homelable would run with upstream defaults.
+ConditionPathExists=/etc/homelab/homelable.env
+
+[Service]
+Type=simple
+User=homelable
+Group=homelable
+WorkingDirectory=/opt/homelable/backend
+EnvironmentFile=/etc/homelab/homelable.env
+ExecStart=/opt/homelable/venv/bin/uvicorn app.main:app \
+  --host 127.0.0.1 --port 8000 --workers 1 \
+  --no-server-header --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=5
+
+# Hardening. Status checks use ping through unprivileged ICMP sockets
+# (net.ipv4.ping_group_range), so no capabilities are needed.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ReadWritePaths=/var/lib/homelable
+
+[Install]
+WantedBy=multi-user.target

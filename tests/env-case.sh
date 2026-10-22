@@ -11,6 +11,7 @@ source "$1"
 if hl_parse_env "$2"; then
   hl_render_scrape self
   hl_render_nft_lan
+  hl_render_scanner_ranges
   if [[ -n "${3:-}" ]]; then
     hl_render_grafana_plugins "$3" || {
       printf '%s\n' "${HL_ERRORS[@]}"
