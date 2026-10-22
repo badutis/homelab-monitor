@@ -265,5 +265,70 @@ plugins_case 0 "prometheus can not be disabled" "${base}GRAFANA_PLUGINS="$'\n' "
 plugins_case 1 "unknown plugin id" "${base}GRAFANA_PLUGINS=loki,not-a-plugin"$'\n' "'not-a-plugin' is not a bundled plugin"
 plugins_case 1 "bad list format" "${base}GRAFANA_PLUGINS=loki mysql"$'\n' "comma-separated list"
 
+# --- sources.lock consistency ----------------------------------------------
+
+lock_field() { grep -E "^$1[[:space:]]" "$repo_root/sources.lock" | tr -s '[:space:]' '\n' | sed -n "s/^$2=//p"; }
+if [ "v$(lock_field grafana version)" = "$(lock_field grafana-src tag)" ]; then
+  ok "sources.lock: Grafana source tag matches the packaged version"
+else
+  not_ok "sources.lock: Grafana source tag matches the packaged version"
+fi
+if grep -q "homelable $(lock_field homelable tag) " "$repo_root/build/homelable/requirements.txt"; then
+  ok "sources.lock: homelable dependency lock is for the pinned tag"
+else
+  not_ok "sources.lock: homelable dependency lock is for the pinned tag (run scripts/update-homelable-lock.sh)"
+fi
+
+# --- release notes ---------------------------------------------------------
+
+rel="$tmp/release"
+mkdir -p "$rel"
+: >"$rel/homelab-monitor-v9.9.9-mkspi.img.xz"
+printf '### Vulnerability scan\n' >"$rel/trivy-summary.md"
+expect 0 "release-notes: renders" "$repo_root/scripts/release-notes.sh" v9.9.9 "$rel"
+for want in "homelab-monitor-v9.9.9-mkspi.img.xz" "blob/v9.9.9/homelab.env.example" \
+  "| Grafana OSS | \`$(lock_field grafana version)\` |" "## Vulnerability scan"; do
+  if grep -qF -- "$want" "$tmp/out"; then ok "release-notes: contains $want"; else not_ok "release-notes: contains $want"; fi
+done
+
+# --- collect-sources.sh (GNU tar only, as on the build host) -----------------
+
+if tar --version 2>/dev/null | grep -q 'GNU tar'; then
+  arm="$tmp/armbian"
+  for tree in linux-kernel-worktree/6.18__x u-boot-worktree/u-boot/v2026.04 arm-trusted-firmware/v2.13.0; do
+    d="$arm/cache/sources/$tree"
+    git_q init -q "$d"
+    printf '*.o\n.config\n' >"$d/.gitignore"
+    printf 'source\n' >"$d/main.c"
+    git_q -C "$d" add -A
+    git_q -C "$d" commit -qm base
+    printf 'patched\n' >"$d/patch.c" # applied patch, not committed
+    printf 'obj\n' >"$d/main.o"      # build output
+    printf 'CONFIG_X=y\n' >"$d/.config"
+  done
+  expect 0 "collect-sources: archives the trees" "$repo_root/scripts/collect-sources.sh" "$arm" "$tmp/src-out"
+  listing="$(xz -dc "$tmp/src-out/linux-source.tar.xz" | tar -t)"
+  for want in linux-source/main.c linux-source/patch.c linux-source/.config; do
+    if printf '%s\n' "$listing" | grep -qx "$want"; then ok "collect-sources: kernel archive has $want"; else not_ok "collect-sources: kernel archive has $want"; fi
+  done
+  if printf '%s\n' "$listing" | grep -q 'main\.o$'; then
+    not_ok "collect-sources: build outputs are left out"
+  else
+    ok "collect-sources: build outputs are left out"
+  fi
+  if xz -dc "$tmp/src-out/arm-trusted-firmware-source.tar.xz" | tar -t | grep -q '\.config$'; then
+    not_ok "collect-sources: .config only added where asked"
+  else
+    ok "collect-sources: .config only added where asked"
+  fi
+  if grep -q 'linux-source.tar.xz' "$tmp/src-out/SOURCES.txt"; then
+    ok "collect-sources: SOURCES.txt lists the archives"
+  else
+    not_ok "collect-sources: SOURCES.txt lists the archives"
+  fi
+else
+  echo "skip collect-sources tests (needs GNU tar)"
+fi
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

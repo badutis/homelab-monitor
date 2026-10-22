@@ -5,6 +5,7 @@
 #
 # Usage: scripts/build-image.sh [work-dir]
 #   work-dir defaults to ./.work; outputs land in <work-dir>/out/.
+#   RELEASE_SOURCES=yes also archives the kernel, U-Boot and TF-A sources.
 
 set -euo pipefail
 
@@ -28,6 +29,12 @@ kernel_tag="$(grep -E '^linux[[:space:]]' "$repo_root/sources.lock" |
 # framework itself is never modified.
 rm -rf "$armbian/userpatches"
 cp -R "$repo_root/build/userpatches" "$armbian/userpatches"
+
+# Version of this build, installed as /usr/share/homelab/VERSION: the release
+# tag, or describe output for development builds.
+version="$(git -C "$repo_root" describe --tags --always --dirty 2>/dev/null || echo unknown)"
+mkdir -p "$armbian/userpatches/overlay/rootfs/usr/share/homelab"
+echo "$version" >"$armbian/userpatches/overlay/rootfs/usr/share/homelab/VERSION"
 
 # Release artifacts for customize-image.sh, verified against sources.lock.
 for artifact in victoriametrics victoriametrics-license grafana; do
@@ -73,8 +80,15 @@ sudo chown -R "$(id -u):$(id -g)" "$out"
 git -c safe.directory="$armbian" -C "$armbian" archive --format=tar.gz --prefix=armbian-mkspi/ \
   -o "$out/armbian-mkspi-src.tar.gz" HEAD
 
+# Releases: corresponding source of the kernel, U-Boot and TF-A as built.
+if [ "${RELEASE_SOURCES:-no}" = yes ]; then
+  sudo "$repo_root/scripts/collect-sources.sh" "$armbian" "$out"
+  sudo chown -R "$(id -u):$(id -g)" "$out"
+fi
+
 # Record exactly what was built (pinned framework commit and build settings).
 {
+  echo "homelab-monitor version: $version"
   echo "homelab-monitor commit: $(git -C "$repo_root" rev-parse HEAD)"
   echo "armbian-mkspi commit:   $(git -c safe.directory="$armbian" -C "$armbian" rev-parse HEAD)"
   echo "build arguments:"
