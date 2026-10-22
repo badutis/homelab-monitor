@@ -10,7 +10,7 @@ and in each release's package list.
 | Linux kernel | GPL-2.0 | [kernel.org](https://www.kernel.org/) | source package attached to the same release |
 | U-Boot | GPL-2.0+ | [u-boot](https://source.denx.de/u-boot/u-boot) | source reference and archive attached to the same release |
 | homelable | MIT, © 2026 Remy Jardinet | [Pouzor/homelable](https://github.com/Pouzor/homelable) | `LICENSE`, the npm packages bundled into the web UI and the Python packages of its venv, each with version and license, installed to `/usr/share/doc/homelable/` |
-| nmap | NPSL | [nmap.org](https://nmap.org/) | **not included**; homelable's network discovery needs it, users can install it from Debian |
+| nmap | NPSL (Nmap Public Source License) | [nmap.org](https://nmap.org/) | unmodified Debian package, for homelable's network discovery; license text in `/usr/share/doc/nmap/copyright`. The image is free and open source and is not sold with any product |
 | Grafana OSS | AGPL-3.0 | [grafana/grafana](https://github.com/grafana/grafana) | source archive of the shipped version attached to each release |
 | VictoriaMetrics | Apache-2.0 | [VictoriaMetrics/VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics) | `LICENSE` and `NOTICE` installed in the image |
 | Debian packages | various (see each package's `/usr/share/doc/*/copyright`) | [debian.org](https://www.debian.org/) | each release ships a `dpkg-query` package list with versions; sources are available from [snapshot.debian.org](https://snapshot.debian.org/) |

@@ -11,7 +11,7 @@ RK3328, 1 GB RAM) into a small, self-contained monitoring box for a homelab.
 | Component | Source | Notes |
 |---|---|---|
 | Armbian Debian Trixie minimal, kernel `current` | [`redrathnure/armbian-mkspi`](https://github.com/redrathnure/armbian-mkspi), built from source | kernel and u-boot frozen (`BSPFREEZE=yes`) |
-| [homelable](https://github.com/Pouzor/homelable) | pinned tag, no Docker | homelab map at `/`; backend in a Python venv (`127.0.0.1:8000`, every dependency SHA256-pinned), web UI built in CI; network discovery (nmap) not included |
+| [homelable](https://github.com/Pouzor/homelable) | pinned tag, no Docker | homelab map at `/`; backend in a Python venv (`127.0.0.1:8000`, every dependency SHA256-pinned), web UI built in CI; network discovery with nmap for the networks in `HOMELABLE_SCAN_CIDR` |
 | [VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics) single-node | official `linux-arm64` release, SHA256-pinned | metrics storage, `127.0.0.1:8428`; data ideally on a separate disk |
 | [Grafana OSS](https://github.com/grafana/grafana) | official `arm64` package, SHA256-pinned, held | dashboards and alerts at `/grafana/`, dark theme, no plugin downloads or telemetry; only the Prometheus datasource is loaded by default, other bundled datasources via `GRAFANA_PLUGINS` |
 | `prometheus-node-exporter` | Debian package | metrics of this box, `127.0.0.1:9100` |

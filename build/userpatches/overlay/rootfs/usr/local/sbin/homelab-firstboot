@@ -135,8 +135,9 @@ CORS_ORIGINS='["http://localhost"]'
 AUTH_MODE=local
 AUTH_USERNAME=admin
 AUTH_PASSWORD_HASH='$homelable_hash'
-# Network discovery needs nmap, which the image does not include.
-SCANNER_RANGES='[]'
+# Networks for nmap discovery (HOMELABLE_SCAN_CIDR); homelabctl keeps this
+# line in sync.
+$(hl_render_scanner_ranges)
 SCANNER_HTTP_RANGES='[]'
 SCANNER_HTTP_PROBE_ENABLED=false
 STATUS_CHECKER_INTERVAL=60

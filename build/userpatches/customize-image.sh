@@ -22,7 +22,7 @@ apt-get update
 apt-get install -y --no-install-recommends \
   prometheus-node-exporter nginx nftables sudo ca-certificates \
   unattended-upgrades apt-listchanges \
-  python3 python3-venv iputils-ping
+  python3 python3-venv iputils-ping nmap
 
 log "installing Grafana $(basename "$DL"/grafana_*_arm64.deb)"
 apt-get install -y --no-install-recommends "$DL"/grafana_*_arm64.deb

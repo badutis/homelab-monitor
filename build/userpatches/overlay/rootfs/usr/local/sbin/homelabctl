@@ -3,8 +3,8 @@
 #
 #   homelabctl check [file]   validate a homelab.env (default: the installed one)
 #   homelabctl apply          regenerate the scrape config, firewall networks,
-#                             metrics retention and Grafana plugins, then
-#                             reload the services
+#                             metrics retention, Grafana plugins and homelable
+#                             scan networks, then reload the services
 #                             (HOMELAB_NO_RELOAD=1: write files only)
 #
 # Edit /etc/homelab/homelab.env as root, then run "sudo homelabctl apply".
@@ -22,6 +22,7 @@ VM_ENV_FILE=/etc/victoria-metrics/victoria-metrics.env
 NFT_LAN_FILE=/etc/homelab/nftables-lan.nft
 GRAFANA_PLUGINS_FILE=/etc/grafana/homelab-plugins.env
 GRAFANA_AVAILABLE_PLUGINS=/usr/share/homelab/grafana-bundled-plugins
+HOMELABLE_ENV_FILE=/etc/homelab/homelable.env
 
 die() {
   echo "homelabctl: $*" >&2
@@ -70,7 +71,7 @@ cmd_check() {
 cmd_apply() {
   [[ $EUID -eq 0 ]] || die "apply must run as root (sudo homelabctl apply)"
   parse_or_die "$ENV_FILE"
-  local self changed_vm=0 changed_nft=0 changed_grafana=0 plugins
+  local self changed_vm=0 changed_nft=0 changed_grafana=0 changed_homelable=0 plugins
   self="$(hostname)"
   plugins="$(mktemp)"
   render_plugins_or_die "$plugins"
@@ -81,6 +82,17 @@ cmd_apply() {
   hl_render_nft_lan | write_file "$NFT_LAN_FILE" 0600 && changed_nft=1
   write_file "$GRAFANA_PLUGINS_FILE" 0644 <"$plugins" && changed_grafana=1
   rm -f "$plugins"
+  # homelable scan networks: replace only the SCANNER_RANGES line of its
+  # env file (the rest holds its secret key and password hash).
+  if [[ -f "$HOMELABLE_ENV_FILE" ]]; then
+    local ranges
+    ranges="$(hl_render_scanner_ranges)"
+    {
+      grep -v '^SCANNER_RANGES=' "$HOMELABLE_ENV_FILE"
+      echo "$ranges"
+    } |
+      write_file "$HOMELABLE_ENV_FILE" 0600 && changed_homelable=1
+  fi
 
   # During first boot the services start after us; only check the rules.
   if [[ "${HOMELAB_NO_RELOAD:-0}" == 1 ]]; then
@@ -102,7 +114,11 @@ cmd_apply() {
     systemctl restart grafana-server.service
     echo "grafana: restarted with plugins: prometheus${HL_GRAFANA_PLUGINS[*]:+ ${HL_GRAFANA_PLUGINS[*]}}"
   fi
-  ((changed_vm || changed_nft || changed_grafana)) || echo "nothing changed"
+  if ((changed_homelable)); then
+    systemctl restart homelable.service
+    echo "homelable: restarted with scan networks: ${HL_SCAN_CIDRS[*]:-none}"
+  fi
+  ((changed_vm || changed_nft || changed_grafana || changed_homelable)) || echo "nothing changed"
 }
 
 case "${1:-}" in

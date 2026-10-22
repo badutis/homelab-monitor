@@ -97,7 +97,7 @@ check "homelable: backend installed" exists opt/homelable/backend/app/main.py
 check "homelable: code is root-owned" owned_by_root opt/homelable
 check "homelable: data dir private" mode_is var/lib/homelable 750
 check "homelable: license and dependency lists" bash -c "sudo test -s '$root/usr/share/doc/homelable/LICENSE' && sudo test -s '$root/usr/share/doc/homelable/python-licenses.txt' && sudo test -s '$root/usr/share/doc/homelable/frontend-licenses.txt'"
-check "homelable: nmap not installed (opt-in)" absent usr/bin/nmap
+check "homelable: nmap installed for network discovery" exists usr/bin/nmap
 # Runs the arm64 interpreter through qemu-user (binfmt), which the Armbian
 # build installs on the runner: proves the venv and the app import cleanly.
 # The app reads its settings at import: a throwaway key, and a database path

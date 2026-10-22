@@ -15,7 +15,8 @@ Configuration:
   /etc/homelab/homelab.env   settings (root only); copied from /boot/homelab.env
                              on first boot
   sudo homelabctl check      validate it
-  sudo homelabctl apply      apply TARGET, LAN_CIDR, RETENTION, SCRAPE_INTERVAL
+  sudo homelabctl apply      apply TARGET, LAN_CIDR, RETENTION, SCRAPE_INTERVAL,
+                             GRAFANA_PLUGINS, HOMELABLE_SCAN_CIDR
   /root/homelab-credentials.txt
                              generated Grafana/homelable admin passwords (if
                              none were set)
@@ -23,7 +24,6 @@ Configuration:
 
 Login: SSH with the key from homelab.env only; no passwords, no root login.
 Grafana and homelable start only after homelab.env has been applied.
-Network discovery in homelable needs nmap, which is not installed
-("sudo apt install nmap" adds it; mind its license, NPSL).
+homelable scans only the networks in HOMELABLE_SCAN_CIDR (none by default).
 Without homelab.env: log in on the console as root (password 1234, Armbian
 asks for a new one at once); SSH stays closed until a key is configured.
