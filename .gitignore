@@ -7,3 +7,6 @@ homelab.env
 /cache/
 *.img
 *.img.xz
+
+# Local build work directory
+/.work/

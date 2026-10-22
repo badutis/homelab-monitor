@@ -1,0 +1,84 @@
+name: build-image
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/build-image.yml
+      - build/**
+      - scripts/build-image.sh
+      - scripts/fetch-source.sh
+      - sources.lock
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/build-image.yml
+      - build/**
+      - scripts/build-image.sh
+      - scripts/fetch-source.sh
+      - sources.lock
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Free disk space
+        run: |
+          df -h / /mnt
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force >/dev/null
+          df -h / /mnt
+
+      - name: Prepare work directory on /mnt
+        run: |
+          sudo mkdir -p /mnt/work
+          sudo chown "$(id -u):$(id -g)" /mnt/work
+
+      - name: Build image
+        run: scripts/build-image.sh /mnt/work
+
+      - name: Disk usage after build
+        if: always()
+        run: df -h / /mnt
+
+      - name: Collect logs after failure
+        if: failure()
+        run: |
+          mkdir -p /mnt/work/out
+          if [ -d /mnt/work/armbian-mkspi/output/logs ]; then
+            sudo tar -C /mnt/work/armbian-mkspi/output -czf /mnt/work/out/build-logs.tar.gz logs
+            sudo chown "$(id -u):$(id -g)" /mnt/work/out/build-logs.tar.gz
+          fi
+
+      - name: Upload image
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: homelab-monitor-image-${{ github.sha }}
+          path: |
+            /mnt/work/out/*.img.xz
+            /mnt/work/out/*.img.xz.sha
+            /mnt/work/out/armbian-mkspi-src.tar.gz
+            /mnt/work/out/BUILD-INFO.txt
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-logs-${{ github.sha }}
+          path: /mnt/work/out/build-logs.tar.gz
+          if-no-files-found: ignore
+          retention-days: 14

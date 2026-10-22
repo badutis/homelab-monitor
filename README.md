@@ -40,6 +40,20 @@ Examples in this repository use only documentation addresses
 
 Later: hardware stage — DS18B20 sensors and fan control on the GPIO header.
 
+## Building
+
+Images are built from source on GitHub-hosted Linux runners
+(`.github/workflows/build-image.yml`): kernel, u-boot and rootfs are compiled
+from the pinned Armbian framework, never downloaded from the Armbian artifact
+cache. To build locally on an Ubuntu 24.04 machine (sudo, ~40 GB free disk):
+
+```bash
+scripts/build-image.sh
+```
+
+Outputs land in `.work/out/`: the `.img.xz` image and its checksum, the source
+archive of the pinned framework, build logs and `BUILD-INFO.txt`.
+
 ## Pinned sources
 
 Upstream components are pinned in [`sources.lock`](sources.lock) by tag **and**
