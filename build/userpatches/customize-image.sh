@@ -53,8 +53,8 @@ tar -xzf "$DL/homelable-frontend.tar.gz" -C /opt/homelable/frontend --no-same-ow
 # setuptools without fetching anything else.
 python3 -m venv /opt/homelable/venv
 pip=(/opt/homelable/venv/bin/pip install --no-cache-dir --disable-pip-version-check --require-hashes)
-"${pip[@]}" --only-binary :all: -r "$DL/build-requirements.lock"
-"${pip[@]}" --only-binary :all: --no-binary python-nmap --no-build-isolation -r "$DL/requirements.lock"
+"${pip[@]}" --only-binary :all: -r "$DL/build-requirements.txt"
+"${pip[@]}" --only-binary :all: --no-binary python-nmap --no-build-isolation -r "$DL/requirements.txt"
 /opt/homelable/venv/bin/python -m compileall -q /opt/homelable/backend/app
 chown -R root:root /opt/homelable
 chmod -R go-w /opt/homelable

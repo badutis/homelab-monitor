@@ -5,6 +5,8 @@
 #   <out>/trivy-report.json   full vulnerability report
 #   <out>/sbom.cdx.json       CycloneDX software bill of materials
 #   <out>/trivy-summary.md    Markdown summary: counts by severity and by source
+#   <out>/trivy.sarif         CRITICAL and HIGH findings as SARIF, for GitHub
+#                             code scanning
 #
 # Report only for now: findings do not fail the build. Linux only, needs sudo
 # and trivy in PATH.
@@ -42,5 +44,10 @@ plugins_env=""
 python3 "$repo_root/scripts/scan-summary.py" "$out/trivy-report.json" \
   "$(basename "$image")" ${plugins_env:+"$plugins_env"} >"$out/trivy-summary.md"
 rm -f "$out/grafana-plugins.env"
+
+# SARIF for GitHub code scanning: only CRITICAL and HIGH, the rest would bury
+# them (most lower findings are Debian packages without a fix yet).
+trivy convert --quiet --format sarif --severity CRITICAL,HIGH \
+  --output "$out/trivy.sarif" "$out/trivy-report.json"
 
 cat "$out/trivy-summary.md"

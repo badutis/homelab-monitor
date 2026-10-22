@@ -94,7 +94,7 @@ pass "with-image-rootfs: loop devices are detached afterwards"
 
 out="$tmp/scan"
 "$repo_root/scripts/scan-image.sh" "$img.xz" "$out" >/dev/null
-for f in trivy-report.json sbom.cdx.json trivy-summary.md; do
+for f in trivy-report.json sbom.cdx.json trivy-summary.md trivy.sarif; do
   [ -s "$out/$f" ] || fail "scan-image: $f written"
 done
 pass "scan-image: report, SBOM and summary written"
@@ -111,6 +111,19 @@ assert sbom["bomFormat"] == "CycloneDX"
 assert any(c.get("name") == "openssl" for c in sbom.get("components", [])), "openssl not in SBOM"
 EOF
 pass "scan-image: Debian detected and openssl vulnerabilities reported"
+
+python3 - "$out/trivy.sarif" <<'EOF' || fail "scan-image: SARIF has only CRITICAL/HIGH findings"
+import json, sys
+sarif = json.load(open(sys.argv[1]))
+assert sarif["version"] == "2.1.0"
+run = sarif["runs"][0]
+assert run["results"], "no results"
+rules = {r["id"]: r for r in run["tool"]["driver"]["rules"]}
+for res in run["results"]:
+    tags = rules[res["ruleId"]]["properties"]["tags"]
+    assert "CRITICAL" in tags or "HIGH" in tags, (res["ruleId"], tags)
+EOF
+pass "scan-image: SARIF has only CRITICAL/HIGH findings"
 
 grep -q '| CRITICAL |' "$out/trivy-summary.md" || fail "scan-image: summary table"
 pass "scan-image: summary table"

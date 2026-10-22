@@ -2,6 +2,10 @@ name: build-image
 
 on:
   workflow_dispatch:
+  # Weekly rebuild and rescan: new CVEs are published even when nothing here
+  # changes.
+  schedule:
+    - cron: '17 3 * * 1'
   pull_request:
     paths:
       - .github/workflows/build-image.yml
@@ -23,11 +27,15 @@ permissions:
 
 concurrency:
   group: build-image-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede older builds of a pull request; never cancel a develop build.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   image:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write # upload the image scan to code scanning
     timeout-minutes: 340
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -65,6 +73,14 @@ jobs:
           scripts/scan-image.sh "$image" /mnt/work/out
           cat /mnt/work/out/trivy-summary.md >>"$GITHUB_STEP_SUMMARY"
 
+      - name: Upload scan to GitHub code scanning
+        # Pull requests only show the summary; the Security tab tracks develop.
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@8498dc4c2b27cdd99baf0f87955b29ebbf30c78d # v4.39.1
+        with:
+          sarif_file: /mnt/work/out/trivy.sarif
+          category: image
+
       - name: Test image configuration
         run: |
           set -o pipefail
@@ -99,6 +115,7 @@ jobs:
             /mnt/work/out/BUILD-INFO.txt
             /mnt/work/out/trivy-report.json
             /mnt/work/out/trivy-summary.md
+            /mnt/work/out/trivy.sarif
             /mnt/work/out/sbom.cdx.json
             /mnt/work/out/image-tests.txt
           compression-level: 0
