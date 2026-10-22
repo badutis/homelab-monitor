@@ -36,4 +36,7 @@ jobs:
           LEAK_DENYLIST: ${{ secrets.LEAK_DENYLIST }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          # On pull requests check the PR's own commits, not the temporary
+          # merge commit GitHub creates for the test checkout.
+          LEAK_CHECK_LOG_RANGE: ${{ github.event.pull_request.head.sha || github.sha }}
         run: scripts/leak-check.sh
