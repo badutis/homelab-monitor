@@ -1,0 +1,11 @@
+# Pinned upstream sources. One component per line: `<name> key=value ...`.
+# Build scripts fetch each tag and fail unless it resolves to the listed commit
+# (a tag can be moved, a commit cannot). Updating a component = a PR that
+# changes this file.
+
+armbian-mkspi  repo=https://github.com/redrathnure/armbian-mkspi  tag=mkspi/1.3.3-26.08.0-trunk  commit=a4e925877979acf0d9e3897ed854f3281b302cb2
+homelable      repo=https://github.com/Pouzor/homelable          tag=v3.6.0                     commit=56d113dc5b685ce61720dceebd48beb2d4f5c59b
+
+# Added in step 2 (with version and SHA256 of the release artifact):
+#   victoriametrics version=<x.y.z> sha256=<...>
+#   grafana         version=<x.y.z>

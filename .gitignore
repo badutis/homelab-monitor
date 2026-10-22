@@ -1,0 +1,9 @@
+# Real configuration never goes into the repository.
+homelab.env
+*.local
+
+# Build outputs
+/output/
+/cache/
+*.img
+*.img.xz
