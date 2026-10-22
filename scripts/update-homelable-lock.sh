@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Regenerate build/homelable/requirements.lock from the homelable release
+# Regenerate build/homelable/requirements.txt from the homelable release
 # pinned in sources.lock: runtime dependencies only (the "# Dev" section and
 # type stubs are dropped), every package pinned with SHA256 hashes for
-# Python 3.13 on arm64 Linux (Debian trixie). Run after changing the
+# Python 3.13 on arm64 Linux (Debian trixie). Named requirements*.txt so
+# GitHub's dependency graph and Dependabot alerts cover these packages.
+# Run after changing the
 # homelable pin and commit the result. Needs uv.
 #
 # Usage: scripts/update-homelable-lock.sh
@@ -36,8 +38,8 @@ compile() {
     --output-file "$2"
 }
 echo "setuptools" >"$tmp/build-requirements.in"
-compile "$tmp/requirements.in" "$tmp/requirements.lock"
-compile "$tmp/build-requirements.in" "$tmp/build-requirements.lock"
+compile "$tmp/requirements.in" "$tmp/requirements.txt"
+compile "$tmp/build-requirements.in" "$tmp/build-requirements.txt"
 
 header() {
   echo "# homelable $tag backend $1 for Python 3.13, arm64 Linux."
@@ -45,11 +47,11 @@ header() {
 }
 {
   header "runtime dependencies (upstream backend/requirements.txt, runtime part)"
-  cat "$tmp/requirements.lock"
-} >"$repo_root/build/homelable/requirements.lock"
+  cat "$tmp/requirements.txt"
+} >"$repo_root/build/homelable/requirements.txt"
 {
   header "build tool for python-nmap (source only)"
-  cat "$tmp/build-requirements.lock"
-} >"$repo_root/build/homelable/build-requirements.lock"
+  cat "$tmp/build-requirements.txt"
+} >"$repo_root/build/homelable/build-requirements.txt"
 
-echo "updated build/homelable/requirements.lock ($(grep -c '^[a-z]' "$repo_root/build/homelable/requirements.lock") packages)"
+echo "updated build/homelable/requirements.txt ($(grep -c '^[a-z]' "$repo_root/build/homelable/requirements.txt") packages)"

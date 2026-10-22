@@ -4,8 +4,8 @@
 #   <out>/homelable-backend.tar.gz         backend/app, VERSION, LICENSE
 #   <out>/homelable-frontend.tar.gz        built web UI (dist/), served by nginx
 #   <out>/homelable-frontend-licenses.txt  licenses of the bundled npm packages
-#   <out>/requirements.lock                Python runtime deps, SHA256-pinned
-#   <out>/build-requirements.lock          setuptools for python-nmap, pinned
+#   <out>/requirements.txt                 Python runtime deps, SHA256-pinned
+#   <out>/build-requirements.txt           setuptools for python-nmap, pinned
 #
 # The web UI is built here, not on the board: the build needs ~1.5 GB of RAM.
 # npm runs with --ignore-scripts, so no package install script executes.
@@ -66,5 +66,5 @@ tar -C "$src" -czf "$out/homelable-backend.tar.gz" \
   --exclude='__pycache__' --exclude='*.pyc' \
   backend/app VERSION LICENSE
 
-cp "$repo_root/build/homelable/requirements.lock" "$repo_root/build/homelable/build-requirements.lock" "$out/"
+cp "$repo_root/build/homelable/requirements.txt" "$repo_root/build/homelable/build-requirements.txt" "$out/"
 ls -l "$out"
