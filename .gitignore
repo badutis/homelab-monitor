@@ -7,3 +7,6 @@ homelab.env
 /cache/
 *.img
 *.img.xz
+
+# Local, per-developer notes for coding assistants
+CLAUDE.md
