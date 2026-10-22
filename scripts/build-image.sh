@@ -19,6 +19,11 @@ if [ ! -d "$armbian" ]; then
   "$repo_root/scripts/fetch-source.sh" armbian-mkspi "$armbian"
 fi
 
+# Kernel version is pinned in sources.lock; verify the tag before building.
+"$repo_root/scripts/fetch-source.sh" linux --verify-only
+kernel_tag="$(grep -E '^linux[[:space:]]' "$repo_root/sources.lock" \
+  | tr -s '[:space:]' '\n' | sed -n 's/^tag=//p')"
+
 # Our additions go in through the framework's own userpatches mechanism; the
 # framework itself is never modified.
 rm -rf "$armbian/userpatches"
@@ -31,6 +36,8 @@ build_args=(
   BUILD_MINIMAL=yes
   BUILD_DESKTOP=no
   KERNEL_CONFIGURE=no
+  # Fixed kernel tag instead of the rolling stable branch.
+  "KERNELBRANCH=tag:${kernel_tag}"
   # Kernel and u-boot are not upgraded through apt; a new image replaces them.
   BSPFREEZE=yes
   # Build everything from source: never download prebuilt kernel, u-boot or

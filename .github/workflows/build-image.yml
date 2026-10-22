@@ -10,7 +10,7 @@ on:
       - scripts/fetch-source.sh
       - sources.lock
   push:
-    branches: [main]
+    branches: [develop]
     paths:
       - .github/workflows/build-image.yml
       - build/**
