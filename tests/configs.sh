@@ -108,7 +108,11 @@ EOF
 sudo install -D -m 0644 "$rootfs/usr/local/lib/homelab/homelab.sh" /usr/local/lib/homelab/homelab.sh
 report_ok() {
   # shellcheck disable=SC2024 # output goes to our own temp dir
-  sudo bash "$rootfs/usr/local/sbin/homelabctl" report >"$tmp/report" 2>&1 || return 1
+  sudo bash "$rootfs/usr/local/sbin/homelabctl" report >"$tmp/report" 2>&1 || {
+    echo "homelabctl report failed:"
+    cat "$tmp/report"
+    return 1
+  }
   for section in "== Memory (MB)" "== Services:" "== Grafana plugin processes" \
     "== Top processes by RSS" "== Disks" "== Out-of-memory kills since boot:"; do
     grep -qF "$section" "$tmp/report" || {
