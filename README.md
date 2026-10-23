@@ -3,10 +3,12 @@
 A ready-to-flash Armbian image that turns a **Makerbase MKS Pi** (Rockchip
 RK3328, 1 GB RAM) into a small, self-contained monitoring box for a homelab.
 
-> **Status: early work in progress.** No image has been released yet. The
-> repository is being built up step by step (see [Roadmap](#roadmap)).
+> **Status: pre-release.** The software stack is complete and every build is
+> tested in CI; it is being tried on hardware before the first release
+> (see [Roadmap](#roadmap)). To try a development build, follow
+> [Testing an image on the board](docs/testing-on-hardware.md).
 
-## What will be in the image
+## What is in the image
 
 | Component | Source | Notes |
 |---|---|---|
@@ -40,6 +42,8 @@ On the first boot that finds it, `homelab-firstboot`:
    `homelab.env` from the card.
 
 Later changes: edit `/etc/homelab/homelab.env`, then `sudo homelabctl apply`.
+`sudo homelabctl report` shows memory use per service, memory pressure and
+disks.
 
 Open `http://<box>/` for the homelable map and `http://<box>/grafana/` for
 the dashboards. Both log in as `admin` with the passwords from `homelab.env`
@@ -67,11 +71,21 @@ Examples in this repository use only documentation addresses
 
 ## Roadmap
 
-0. Repository skeleton, pinned sources, leak-check CI.
-1. CI build of a plain Armbian Trixie minimal image from `sources.lock`.
-2. VictoriaMetrics, Grafana, node_exporter, first-boot service.
-3. homelable.
-4. `homelabctl update`, release source archives, `v1.0.0`.
+Done:
+
+- CI builds of the image from pinned sources, with leak, quality,
+  vulnerability and image configuration checks.
+- VictoriaMetrics, Grafana, node_exporter, first-boot configuration,
+  firewall.
+- homelable at `/`, network discovery.
+- Release workflow with sources and build provenance.
+
+Next:
+
+- Testing on hardware and a week of memory measurements; `v0.1.0-rc.1`.
+- `homelabctl update`: update the applications without reflashing.
+- Links from homelable nodes to their Grafana dashboards.
+- `v1.0.0`.
 
 Later: hardware stage — DS18B20 sensors and fan control on the GPIO header.
 

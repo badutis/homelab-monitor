@@ -17,6 +17,7 @@ Configuration:
   sudo homelabctl check      validate it
   sudo homelabctl apply      apply TARGET, LAN_CIDR, RETENTION, SCRAPE_INTERVAL,
                              GRAFANA_PLUGINS, HOMELABLE_SCAN_CIDR
+  sudo homelabctl report     memory per service, memory pressure, disks
   /root/homelab-credentials.txt
                              generated Grafana/homelable admin passwords (if
                              none were set)

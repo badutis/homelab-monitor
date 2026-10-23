@@ -6,6 +6,8 @@
 #                             metrics retention, Grafana plugins and homelable
 #                             scan networks, then reload the services
 #                             (HOMELAB_NO_RELOAD=1: write files only)
+#   homelabctl report         memory, pressure, per-service use and disks, for
+#                             sizing the box (run with sudo for full detail)
 #
 # Edit /etc/homelab/homelab.env as root, then run "sudo homelabctl apply".
 # User, SSH keys, host name, time zone and data disk are set on first boot
@@ -57,6 +59,52 @@ render_plugins_or_die() {
     for e in "${HL_ERRORS[@]}"; do echo "homelabctl: $e" >&2; done
     exit 1
   fi
+}
+
+mb() { [[ "$1" =~ ^[0-9]+$ ]] && echo "$(($1 / 1048576))" || echo "-"; }
+
+cmd_report() {
+  echo "homelab-monitor report, $(date '+%Y-%m-%d %H:%M %Z')"
+  echo "version $(cat /usr/share/homelab/VERSION 2>/dev/null || echo unknown), $(uptime -p)"
+
+  echo
+  echo "== Memory (MB)"
+  free -m
+  if [[ -r /proc/pressure/memory ]]; then
+    echo
+    echo "== Memory pressure (share of time stalled, %)"
+    cat /proc/pressure/memory
+  fi
+
+  echo
+  echo "== Services: memory now / peak since start (MB)"
+  printf '%-26s %-9s %7s %7s %6s\n' service state now peak tasks
+  local unit
+  # One property per call: with several, systemctl prints them in its own order.
+  prop() { systemctl show "$1.service" -p "$2" --value 2>/dev/null || echo -; }
+  for unit in victoria-metrics grafana-server homelable nginx prometheus-node-exporter; do
+    printf '%-26s %-9s %7s %7s %6s\n' "$unit" "$(prop "$unit" ActiveState)" \
+      "$(mb "$(prop "$unit" MemoryCurrent)")" "$(mb "$(prop "$unit" MemoryPeak)")" \
+      "$(prop "$unit" TasksCurrent)"
+  done
+
+  echo
+  echo "== Grafana plugin processes (RSS MB)"
+  ps -eo rss=,args= | awk '/gpx_/ && !/awk/ {n++; kb += $1; sub(/.*\//, "", $2); print "  " int($1 / 1024) "  " $2}
+    END {print "  " n + 0 " process(es), " int(kb / 1024) " MB"}'
+
+  echo
+  echo "== Top processes by RSS (MB)"
+  # awk stops printing instead of closing the pipe early (pipefail).
+  ps -eo rss=,comm= --sort=-rss | awk 'NR <= 10 {printf "  %6d  %s\n", $1 / 1024, $2}'
+
+  echo
+  echo "== Disks"
+  # df exits non-zero if a path is missing; show what exists.
+  { df -h / /var/lib/victoria-metrics /var/lib/homelable 2>/dev/null || true; } | awk 'NR == 1 || !seen[$0]++'
+
+  echo
+  echo "== Out-of-memory kills since boot: $(journalctl -k -b -q 2>/dev/null | grep -ci 'out of memory' || true)"
 }
 
 cmd_check() {
@@ -124,8 +172,9 @@ cmd_apply() {
 case "${1:-}" in
   check) cmd_check "${2:-}" ;;
   apply) cmd_apply ;;
+  report) cmd_report ;;
   *)
-    sed -n '2,12s/^# \{0,1\}//p' "$0"
+    sed -n '2,14s/^# \{0,1\}//p' "$0"
     exit 2
     ;;
 esac
