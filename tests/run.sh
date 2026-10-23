@@ -265,6 +265,47 @@ plugins_case 0 "prometheus can not be disabled" "${base}GRAFANA_PLUGINS="$'\n' "
 plugins_case 1 "unknown plugin id" "${base}GRAFANA_PLUGINS=loki,not-a-plugin"$'\n' "'not-a-plugin' is not a bundled plugin"
 plugins_case 1 "bad list format" "${base}GRAFANA_PLUGINS=loki mysql"$'\n' "comma-separated list"
 
+# --- scan-summary.py ---------------------------------------------------------
+
+ss="$tmp/scan-summary"
+mkdir -p "$ss"
+cat >"$ss/report.json" <<'EOF'
+{"Metadata": {"OS": {"Family": "debian", "Name": "13.7"}},
+ "Results": [
+  {"Target": "mkspi (debian 13.7)", "Class": "os-pkgs", "Vulnerabilities": [
+    {"Severity": "CRITICAL"}, {"Severity": "HIGH", "FixedVersion": "1.2"}]},
+  {"Target": "usr/share/grafana/bin/grafana", "Class": "lang-pkgs", "Vulnerabilities": [
+    {"Severity": "HIGH", "FixedVersion": "0.9"}]},
+  {"Target": "usr/share/grafana/data/plugins-bundled/loki/gpx_loki", "Class": "lang-pkgs", "Vulnerabilities": [
+    {"Severity": "MEDIUM", "FixedVersion": "2"}]},
+  {"Target": "usr/share/grafana/data/plugins-bundled/prometheus/gpx_prom", "Class": "lang-pkgs", "Vulnerabilities": [
+    {"Severity": "LOW"}]},
+  {"Target": "usr/local/bin/victoria-metrics-prod", "Class": "lang-pkgs", "Vulnerabilities": [
+    {"Severity": "HIGH", "FixedVersion": "1.27.3"}]},
+  {"Target": "usr/lib/empty", "Class": "lang-pkgs"}
+ ]}
+EOF
+printf 'GF_PLUGINS_DISABLE_PLUGINS=loki,tempo\n' >"$ss/plugins.env"
+expect 0 "scan-summary: renders" python3 "$repo_root/scripts/scan-summary.py" "$ss/report.json" test.img.xz "$ss/plugins.env"
+for want in '| CRITICAL | 1 | 0 |' '| HIGH | 3 | 3 |' \
+  '| Debian packages | 1 (0) | 1 (1) | – | – | – |' \
+  '| Grafana | – | 1 (1) | – | – | – |' \
+  '| Grafana bundled plugins (not loaded by default) | – | – | 1 (1) | – | – |' \
+  '| Grafana bundled plugins (loaded) | – | – | – | 1 (0) | – |' \
+  '| VictoriaMetrics | – | 1 (1) | – | – | – |' 'OS: debian 13.7'; do
+  if grep -qF -- "$want" "$tmp/out"; then ok "scan-summary: $want"; else
+    not_ok "scan-summary: $want"
+    sed 's/^/     | /' "$tmp/out"
+  fi
+done
+expect 0 "scan-summary: works without the plugin list" python3 "$repo_root/scripts/scan-summary.py" "$ss/report.json" test.img.xz
+if grep -qF '| Grafana bundled plugins | – | – | 1 (1) | 1 (0) | – |' "$tmp/out"; then
+  ok "scan-summary: plugins counted together without the list"
+else
+  not_ok "scan-summary: plugins counted together without the list"
+  sed 's/^/     | /' "$tmp/out"
+fi
+
 # --- sources.lock consistency ----------------------------------------------
 
 lock_field() { grep -E "^$1[[:space:]]" "$repo_root/sources.lock" | tr -s '[:space:]' '\n' | sed -n "s/^$2=//p"; }
