@@ -135,7 +135,8 @@ sys.exit(0 if bcrypt.checkpw(sys.argv[2].encode(), stored.encode()) else 1)
 PY
 }
 check "homelable: password hash matches the given password" hash_matches "$h" Test-password-123
-check "homelable: password hash rejects another password" bash -c "! $(declare -f hash_matches); hash_matches '$h' wrong-password-123"
+hash_rejects() { ! hash_matches "$@"; }
+check "homelable: password hash rejects another password" hash_rejects "$h" wrong-password-123
 check "homelable: scan networks" has "$h" "^SCANNER_RANGES='\\[\"192\\.0\\.2\\.0/24\"\\]'$"
 
 check "victoria-metrics: scrape config has the target" has /etc/victoria-metrics/scrape.yml "targets: \\['192\\.0\\.2\\.10:9100'\\]"
@@ -159,8 +160,10 @@ check "apply: LAN networks replaced" has /etc/homelab/nftables-lan.nft '^define 
 check "apply: firewall file stays 0600" mode_is /etc/homelab/nftables-lan.nft 600
 check "apply: loki disabled again" has /etc/grafana/homelab-plugins.env '^GF_PLUGINS_DISABLE_PLUGINS=loki,mysql,tempo$'
 check "apply: homelable scan networks cleared" has "$h" "^SCANNER_RANGES='\\[\\]'$"
-check "apply: homelable secret key kept" bash -c "[ \"\$(sed -n 's/^SECRET_KEY=//p' $h)\" = '$secret' ]"
-check "apply: homelable password hash kept" bash -c "[ \"\$(sed -n 's/^AUTH_PASSWORD_HASH=//p' $h)\" = \"$hash_before\" ]"
+# Compared here, not in bash -c: the bcrypt hash contains "$".
+same_field() { [ "$(field "$1" "$2")" = "$3" ]; }
+check "apply: homelable secret key kept" same_field "$h" SECRET_KEY "$secret"
+check "apply: homelable password hash kept" same_field "$h" AUTH_PASSWORD_HASH "$hash_before"
 check "apply: homelable env stays 0600" mode_is "$h" 600
 check "apply: firewall still loads" nft -c -f /etc/nftables.conf
 
