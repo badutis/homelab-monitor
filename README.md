@@ -93,8 +93,28 @@ CI also scans every built image with [Trivy](https://github.com/aquasecurity/tri
 (`scripts/scan-image.sh`): a vulnerability report for the installed Debian
 packages and the bundled binaries (`trivy-report.json`; the job summary
 breaks it down by source: Debian, Grafana, its bundled plugins — loaded or
-not — and VictoriaMetrics) and a CycloneDX SBOM (`sbom.cdx.json`). The scan
-reports; it does not fail the build yet.
+not — and VictoriaMetrics) and a CycloneDX SBOM (`sbom.cdx.json`). CRITICAL and
+HIGH findings of `develop` builds also go to the Security tab (code
+scanning), with a weekly rebuild. The scan reports; it does not fail the
+build yet.
+
+## Releases
+
+Releases are cut from `main` only:
+
+1. `main` is fast-forwarded to a `develop` commit whose leak check, quality
+   checks and image build have passed (and that has been tried on a board).
+2. Push a tag `vX.Y.Z` (or `vX.Y.Z-rc.N` for a pre-release) on that commit.
+3. The release workflow checks the tag is on `main`, rebuilds the image,
+   archives the kernel, U-Boot and TF-A sources as built plus the Grafana
+   source, writes `SHA256SUMS`, attests build provenance for every asset and
+   creates a **draft** GitHub release.
+4. Review the draft and publish it.
+
+Each release ships the image (`homelab-monitor-vX.Y.Z-mkspi.img.xz`), its
+SBOM, vulnerability report, installed package list, image test results and
+the corresponding sources. Verify a download with `sha256sum -c SHA256SUMS`
+and `gh attestation verify <file> --repo badutis/homelab-monitor`.
 
 ## Pinned sources
 

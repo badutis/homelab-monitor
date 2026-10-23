@@ -7,6 +7,9 @@ armbian-mkspi  repo=https://github.com/redrathnure/armbian-mkspi  tag=mkspi/1.3.
 # Kernel for BRANCH=current. Armbian otherwise follows the rolling
 # linux-6.18.y branch; pinned to the version upstream armbian-mkspi tested.
 linux          repo=https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git  tag=v6.18.43  commit=7b923c78b50d2ec52690c4353e5aad8302e80599
+# Grafana source for the AGPL-3.0 source offer in releases (same version as
+# the grafana package below).
+grafana-src    repo=https://github.com/grafana/grafana  tag=v13.2.4  commit=af4a33e3786594ad72f72d97e6744010330c2977
 homelable      repo=https://github.com/Pouzor/homelable          tag=v3.6.0                     commit=56d113dc5b685ce61720dceebd48beb2d4f5c59b
 
 # Release artifacts: downloaded at build time and checked against sha256=
