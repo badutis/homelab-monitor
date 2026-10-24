@@ -65,8 +65,9 @@ if [[ -n "$HL_HOSTNAME" ]]; then
   old="$(hostname)"
   echo "$HL_HOSTNAME" >/etc/hostname
   hostname "$HL_HOSTNAME"
-  sed -i -E "s/^(127\.0\.1\.1[[:space:]]+).*/\1$HL_HOSTNAME/" /etc/hosts
-  grep -qE '^127\.0\.1\.1[[:space:]]' /etc/hosts || echo "127.0.1.1 $HL_HOSTNAME" >>/etc/hosts
+  # Rewrite /etc/hosts in place (not sed -i, which replaces the file).
+  hosts="$(grep -vE '^127\.0\.1\.1[[:space:]]' /etc/hosts || true)"
+  printf '%s\n127.0.1.1 %s\n' "$hosts" "$HL_HOSTNAME" >/etc/hosts
   log "host name $old -> $HL_HOSTNAME"
 fi
 if [[ -n "$HL_TIMEZONE" ]]; then

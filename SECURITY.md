@@ -26,11 +26,24 @@ well; we pick up fixes through `sources.lock` and new images.
 Every pull request runs:
 
 - a leak check (`gitleaks`, private addresses, MAC addresses, host names,
-  a private denylist);
+  AI-attribution lines, a private denylist) over files, commits and PR text;
 - `shellcheck`, `shfmt`, `actionlint` and `zizmor` (GitHub Actions security);
-- script tests (`tests/run.sh`, `tests/image-tools.sh`).
+- tests: `homelab.env` parsing (including injection attempts), the first-boot
+  service end to end in Debian trixie, firewall/nginx/sshd configuration with
+  the real tools, image tooling (see the README for the full list).
 
-Every built image is scanned with Trivy (vulnerability report and CycloneDX
-SBOM, published as build artifacts).
+Every image build is scanned with Trivy (vulnerability report, CycloneDX
+SBOM); CRITICAL and HIGH findings of `develop` builds appear in the Security
+tab, with a weekly rebuild for new CVEs. `scripts/test-image.sh` checks the
+built image itself: key-only SSH without root login, no console autologin,
+no configuration or secrets baked in, services on localhost, firewall policy.
 
-All third-party actions are pinned by commit SHA and updated by Dependabot.
+Supply chain:
+
+- third-party actions pinned by commit SHA, updated by Dependabot;
+- upstream sources pinned by tag and commit, release artifacts by SHA256
+  (`sources.lock`); homelable's Python dependencies by SHA256, its web UI
+  built with `npm ci --ignore-scripts`;
+- Dependabot alerts cover homelable's Python dependencies;
+- releases carry `SHA256SUMS` and a build provenance attestation for every
+  asset (`gh attestation verify`).

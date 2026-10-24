@@ -27,8 +27,21 @@ sensors and fan control — are planned for a later stage, after `v1.0.0`.
 
 The image contains **no addresses, keys or host names**. After flashing,
 copy [`homelab.env.example`](homelab.env.example) to the FAT boot partition
-of the card as `homelab.env` and edit it (login user, SSH key, machines to
-monitor, optional data disk and time zone).
+of the card as `homelab.env` and edit it. The example documents every
+setting; in short:
+
+| Setting | Required | Applied | Purpose |
+|---|---|---|---|
+| `HOMELAB_USER` | yes | first boot | login user (key only, passwordless sudo) |
+| `HOMELAB_SSH_KEY` | yes, repeatable | first boot | SSH public key(s) of that user |
+| `HOSTNAME`, `TIMEZONE` | no | first boot | host name, time zone |
+| `DATA_DISK_UUID` | no | first boot | separate disk for the metrics database |
+| `GRAFANA_ADMIN_PASSWORD`, `HOMELABLE_ADMIN_PASSWORD` | no | first boot | admin passwords; generated if empty |
+| `TARGET` | no, repeatable | `homelabctl apply` | machines to monitor: `<job> <name> <host:port> [<path>]` |
+| `LAN_CIDR` | no, repeatable | `homelabctl apply` | networks allowed to reach SSH and the web UI |
+| `RETENTION`, `SCRAPE_INTERVAL` | no | `homelabctl apply` | metrics retention, collection interval |
+| `GRAFANA_PLUGINS` | no | `homelabctl apply` | extra Grafana datasources to load |
+| `HOMELABLE_SCAN_CIDR` | no, repeatable | `homelabctl apply` | networks homelable may scan for devices |
 
 On the first boot that finds it, `homelab-firstboot`:
 
@@ -160,15 +173,26 @@ Every pull request runs:
 - **leak check** — `gitleaks` plus a scan of files, commit messages and PR text
   for private IPv4 ranges, MAC addresses and internal host names;
 - **quality** — `shellcheck`, `shfmt` (style in `.editorconfig`), `actionlint`,
-  `zizmor` (GitHub Actions security) and the script tests;
-- **image build** — when the build inputs change.
+  `zizmor` (GitHub Actions security) and the tests below;
+- **image build** — when the build inputs change: builds the image, scans it
+  and runs `scripts/test-image.sh` against it.
 
-Run the same checks locally before pushing:
+| Tests | What they cover | Where |
+|---|---|---|
+| `tests/run.sh` | leak check, pinned sources, `homelab.env` parsing and rendering, Grafana plugin list, release notes, scan summary, source archives | anywhere (bash, git, python3) |
+| `tests/configs.sh` | firewall rules (`nft -c`), nginx site (`nginx -t`), effective sshd settings (`sshd -T`), YAML/JSON, `homelabctl report` | Linux with sudo (CI) |
+| `tests/firstboot.sh` | `homelab-firstboot` and `homelabctl` end to end in Debian trixie | throwaway container (CI) |
+| `tests/image-tools.sh` | mounting an image, package list, vulnerability scan, SBOM, SARIF | Linux with sudo (CI) |
+| `scripts/test-image.sh` | the built image: SSH, autologin, no baked secrets, services, listen addresses, firewall, packages, ownership, homelable import | every image build |
+
+Run the portable checks locally before pushing:
 
 ```bash
-scripts/leak-check.sh
+LEAK_DENYLIST_FILE=<private word list> scripts/leak-check.sh
 tests/run.sh
-shellcheck -x scripts/*.sh tests/*.sh && shfmt -d scripts tests && actionlint && zizmor --offline .github/workflows
+shellcheck -x -P SCRIPTDIR scripts/*.sh tests/*.sh build/userpatches/*.sh \
+  build/userpatches/overlay/rootfs/usr/local/sbin/* build/userpatches/overlay/rootfs/usr/local/lib/homelab/*.sh
+shfmt -d scripts tests build && actionlint && zizmor --offline .github/workflows
 ```
 
 Security issues: see [`SECURITY.md`](SECURITY.md).

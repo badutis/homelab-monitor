@@ -85,6 +85,20 @@ jobs:
       - name: Image tooling tests
         run: tests/image-tools.sh
 
+  firstboot:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: First boot and homelabctl in Debian trixie
+        # The image's base system, pinned by digest; a throwaway container.
+        run: |
+          docker run --rm --cap-add NET_ADMIN --cap-add SYS_ADMIN -v "$PWD:/src:ro" \
+            debian@sha256:4c25275446ca371766b8b093c696782eabce06263fccacb8d5d813b3dc44b308 \
+            /src/tests/firstboot.sh /src
+
   configs:
     runs-on: ubuntu-24.04
     steps:

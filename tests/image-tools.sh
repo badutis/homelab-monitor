@@ -55,6 +55,7 @@ Status: install ok installed
 Priority: optional
 Section: utils
 Architecture: arm64
+Source: openssl (3.0.0-1)
 Version: 3.0.0-1
 Description: Secure Sockets Layer toolkit
 
@@ -89,6 +90,17 @@ if losetup -a | grep -q "$tmp"; then
   fail "with-image-rootfs: loop devices are detached afterwards"
 fi
 pass "with-image-rootfs: loop devices are detached afterwards"
+
+# --- image-manifest.sh -------------------------------------------------------
+
+"$repo_root/scripts/with-image-rootfs.sh" "$img.xz" \
+  "$repo_root/scripts/image-manifest.sh" "$tmp/packages.tsv" >/dev/null ||
+  fail "image-manifest: runs"
+[ "$(head -n 1 "$tmp/packages.tsv")" = "$(printf 'package\tversion\tarchitecture\tsource\tsource_version')" ] ||
+  fail "image-manifest: header"
+grep -qx "$(printf 'openssl\t3.0.0-1\tarm64\topenssl\t3.0.0-1')" "$tmp/packages.tsv" ||
+  fail "image-manifest: lists the package with its source version"
+pass "image-manifest: lists packages with source versions"
 
 # --- scan-image.sh -----------------------------------------------------------
 
